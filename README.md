@@ -1,23 +1,1221 @@
-# Jnanagni Backend API Documentation
+# Jnanagni Node.js Backend API Documentation
 
-This document provides comprehensive API documentation for the Jnanagni Backend Node.js application.
+Complete API documentation for the Jnanagni event management system backend.
 
 ## Table of Contents
-- [Authentication](#authentication)
-- [User Management](#user-management)
-- [Event Management](#event-management)
-- [Admin Operations](#admin-operations)
 
-## Base URL
+1. [Setup & Installation](#setup--installation)
+2. [Environment Variables](#environment-variables)
+3. [Project Structure](#project-structure)
+4. [Authentication](#authentication)
+5. [API Endpoints](#api-endpoints)
+6. [Database Models](#database-models)
+7. [Error Handling](#error-handling)
+8. [Running the Server](#running-the-server)
+
+---
+
+## Setup & Installation
+
+### Prerequisites
+
+- Node.js v16+ 
+- MongoDB v5.0+
+- npm or pnpm
+- Nodemailer setup (for email services)
+
+### Installation Steps
+
+```bash
+# Navigate to node directory
+cd /srv/containers/jnanagni-full/node
+
+# Install dependencies
+pnpm install
+
+# Copy environment variables
+cp .env.example .env.local
+
+# Run the server
+pnpm dev          # Development with hot reload
+pnpm start        # Production mode
 ```
-http://localhost:3000/api
+
+---
+
+## Environment Variables
+
+Create a `.env.local` file with the following variables:
+
+```env
+# Server
+PORT=8001
+NODE_ENV=development
+
+# Database
+MONGODB_URI=mongodb://mongodb:27017/jnanagni
+
+# JWT
+JWT_SECRET=your-secret-key-here
+JWT_EXPIRES_IN=7d
+
+# Admin Access
+ADMIN_SECRET=secure-admin-secret
+
+# Email Service (Nodemailer)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-app-password
+
+# Frontend URLs (for email links)
+FRONTEND_URL=http://localhost:3000
 ```
+
+---
+
+## Project Structure
+
+```
+src/
+├── apis/                    # Route definitions
+│   ├── auth.api.js         # Authentication routes
+│   ├── user.api.js         # User management routes
+│   ├── event.api.js        # Event & registration routes
+│   └── admin.api.js        # Admin management routes
+├── controllers/             # Business logic
+│   ├── auth.controller.js
+│   ├── user.controller.js
+│   ├── event.controller.js
+│   └── registration.controller.js
+├── models/                  # Database schemas
+│   ├── user.model.js
+│   ├── event.model.js
+│   ├── eventcategory.model.js
+│   └── registration.model.js
+├── middlewares/             # Express middleware
+│   ├── auth.middleware.js   # JWT verification
+│   ├── access.middleware.js # Role-based access control
+│   ├── ownership.middleware.js
+│   ├── error.middleware.js
+│   └── upload.middleware.js # File upload handling
+├── services/                # External services
+│   └── email.service.js     # Email sending
+├── templates/               # Email templates
+├── utils/                   # Helper functions
+│   ├── ApiError.js
+│   ├── ApiResponse.js
+│   └── asyncHandler.js
+├── app.js                   # Express app setup
+└── server.js                # Entry point
+```
+
+---
 
 ## Authentication
 
-### Register User
-- **Route**: `POST /auth/register`
-- **Description**: Register a new user account
+### JWT Token Structure
+
+```javascript
+{
+  id: "user_mongodb_id",
+  email: "user@example.com",
+  role: "student",
+  expiresIn: "7d"
+}
+```
+
+### Authorization Header
+
+All protected routes require:
+
+```
+Authorization: Bearer <JWT_TOKEN>
+```
+
+### Token Expiration
+
+- **Duration**: 7 days (configurable via `JWT_EXPIRES_IN`)
+- **Stored in**: HTTP-only cookies (recommended) or localStorage
+- **Transmitted**: Authorization header for API calls
+
+### User Roles
+
+#### Primary Roles
+- `student` - Default student role
+- `gkvian` - GKV alumni
+- `fetian` - FET campus student
+- `faculty` - Faculty member
+
+#### Special Roles (from `specialRoles` array)
+- `admin` - Full system access
+- `event_coordinator` - Manage specific events
+- `category_lead` - Manage event category
+- `volunteer` - Help with event management
+- `finance_team` - Handle payments
+- `None` - No special role
+
+---
+
+## API Endpoints
+
+### 1. AUTHENTICATION ROUTES
+
+#### Register User
+```
+POST /api/v1/auth/register
+```
+
+**Public** - No token required
+
+**Request Body:**
+```json
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "password": "SecurePassword123!",
+  "contactNo": "+91-9876543210",
+  "whatsappNo": "+91-9876543210",
+  "college": "Delhi University",
+  "branch": "Computer Science",
+  "campus": "FET",
+  "role": "student",
+  "adminSecret": "optional-admin-secret"
+}
+```
+
+**Response (201 - Created):**
+```json
+{
+  "success": true,
+  "data": {
+    "jnanagniId": "JGN26-A1B2"
+  },
+  "message": "Registration successful. Please check your email to verify account."
+}
+```
+
+**Error Response (400 - Bad Request):**
+```json
+{
+  "success": false,
+  "message": "User already exists with this email"
+}
+```
+
+---
+
+#### Login User
+```
+POST /api/v1/auth/login
+```
+
+**Public** - No token required
+
+**Request Body:**
+```json
+{
+  "email": "john@example.com",
+  "password": "SecurePassword123!"
+}
+```
+
+**Response (200 - OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "user": {
+      "_id": "507f1f77bcf86cd799439011",
+      "name": "John Doe",
+      "email": "john@example.com",
+      "jnanagniId": "JGN26-A1B2",
+      "role": "student",
+      "specialRoles": ["None"],
+      "college": "Delhi University",
+      "isVerified": true,
+      "paymentStatus": "pending"
+    }
+  },
+  "message": "Login successful"
+}
+```
+
+**Error Response (403 - Forbidden):**
+```json
+{
+  "success": false,
+  "message": "Email not verified",
+  "data": {
+    "email": "john@example.com"
+  }
+}
+```
+
+---
+
+#### Verify Email
+```
+POST /api/v1/auth/verify-email
+```
+
+**Public** - No token required
+
+**Request Body:**
+```json
+{
+  "jnanagniId": "JGN26-A1B2",
+  "token": "verification-token-from-email"
+}
+```
+
+**Response (200 - OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "user": {
+      "_id": "507f1f77bcf86cd799439011",
+      "name": "John Doe",
+      "email": "john@example.com",
+      "jnanagniId": "JGN26-A1B2",
+      "isVerified": true
+    }
+  },
+  "message": "Email verified successfully"
+}
+```
+
+---
+
+#### Resend Verification Email
+```
+POST /api/v1/auth/resend-verification
+```
+
+**Public** - No token required
+
+**Request Body:**
+```json
+{
+  "email": "john@example.com"
+}
+```
+
+**Response (200 - OK):**
+```json
+{
+  "success": true,
+  "message": "Verification email sent. Please check your email."
+}
+```
+
+---
+
+#### Get Current User
+```
+GET /api/v1/auth/me
+```
+
+**Protected** - Requires valid JWT token
+
+**Headers:**
+```
+Authorization: Bearer <JWT_TOKEN>
+```
+
+**Response (200 - OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "_id": "507f1f77bcf86cd799439011",
+      "name": "John Doe",
+      "email": "john@example.com",
+      "jnanagniId": "JGN26-A1B2",
+      "role": "student",
+      "specialRoles": ["None"],
+      "college": "Delhi University",
+      "branch": "Computer Science",
+      "campus": "FET",
+      "isVerified": true,
+      "paymentStatus": "pending",
+      "createdAt": "2025-12-24T10:00:00Z"
+    }
+  }
+}
+```
+
+---
+
+#### Forgot Password
+```
+POST /api/v1/auth/forgot-password
+```
+
+**Public** - No token required
+
+**Request Body:**
+```json
+{
+  "email": "john@example.com"
+}
+```
+
+**Response (200 - OK):**
+```json
+{
+  "success": true,
+  "message": "Password reset OTP sent to your email"
+}
+```
+
+---
+
+#### Reset Password
+```
+POST /api/v1/auth/reset-password
+```
+
+**Public** - No token required
+
+**Request Body:**
+```json
+{
+  "email": "john@example.com",
+  "otp": "123456",
+  "password": "NewSecurePassword123!"
+}
+```
+
+**Response (200 - OK):**
+```json
+{
+  "success": true,
+  "message": "Password reset successfully"
+}
+```
+
+---
+
+### 2. USER ROUTES
+
+#### Get User by Jnanagni ID (Scan)
+```
+GET /api/v1/users/scan/:jnanagniId
+```
+
+**Protected** - Requires token  
+**Authorized Roles**: admin, event_coordinator, volunteer, category_lead
+
+**Response (200 - OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "_id": "507f1f77bcf86cd799439011",
+    "name": "John Doe",
+    "jnanagniId": "JGN26-A1B2",
+    "email": "john@example.com",
+    "college": "Delhi University",
+    "paymentStatus": "verified",
+    "isVerified": true
+  }
+}
+```
+
+---
+
+#### Check Payment Status
+```
+GET /api/v1/users/payment-status/:jnanagniId
+```
+
+**Protected** - Requires token  
+**Authorized Roles**: admin, finance_team, event_coordinator, volunteer
+
+**Response (200 - OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "jnanagniId": "JGN26-A1B2",
+    "paymentStatus": "verified",
+    "email": "john@example.com"
+  }
+}
+```
+
+---
+
+#### Get All Users
+```
+GET /api/v1/users/all/users
+```
+
+**Protected** - Requires token  
+**Authorized Roles**: admin only
+
+**Response (200 - OK):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "_id": "507f1f77bcf86cd799439011",
+      "name": "John Doe",
+      "email": "john@example.com",
+      "jnanagniId": "JGN26-A1B2",
+      "role": "student",
+      "paymentStatus": "verified",
+      "isVerified": true
+    }
+  ]
+}
+```
+
+---
+
+#### Get Unverified Users
+```
+GET /api/v1/users/all/unverified
+```
+
+**Protected** - Requires token  
+**Authorized Roles**: admin only
+
+**Response (200 - OK):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "_id": "507f1f77bcf86cd799439011",
+      "name": "John Doe",
+      "email": "john@example.com",
+      "jnanagniId": "JGN26-A1B2",
+      "isVerified": false
+    }
+  ]
+}
+```
+
+---
+
+#### Verify User Payment
+```
+PUT /api/v1/users/payments/verify/:id
+```
+
+**Protected** - Requires token  
+**Authorized Roles**: admin, finance_team
+
+**Request Body:**
+```json
+{
+  "paymentStatus": "verified"
+}
+```
+
+**Response (200 - OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "_id": "507f1f77bcf86cd799439011",
+    "paymentStatus": "verified"
+  },
+  "message": "Payment verified successfully"
+}
+```
+
+---
+
+### 3. EVENT ROUTES
+
+#### Get All Event Categories
+```
+GET /api/v1/events/categories
+```
+
+**Public** - No token required
+
+**Response (200 - OK):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "_id": "507f1f77bcf86cd799439012",
+      "name": "Web Development",
+      "description": "Web dev events",
+      "categoryLead": "507f1f77bcf86cd799439011"
+    }
+  ]
+}
+```
+
+---
+
+#### Get Event Category by ID
+```
+GET /api/v1/events/categories/:id
+```
+
+**Public** - No token required
+
+**Response (200 - OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "_id": "507f1f77bcf86cd799439012",
+    "name": "Web Development",
+    "description": "Web dev events"
+  }
+}
+```
+
+---
+
+#### Get All Events
+```
+GET /api/v1/events
+```
+
+**Public** - No token required
+
+**Query Parameters:**
+- `category` - Filter by category ID
+- `limit` - Results per page (default: 10)
+- `page` - Page number (default: 1)
+
+**Response (200 - OK):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "_id": "507f1f77bcf86cd799439013",
+      "name": "Hackathon 2025",
+      "description": "24-hour coding competition",
+      "slug": "hackathon-2025",
+      "category": "507f1f77bcf86cd799439012",
+      "venue": "FET Main Hall",
+      "date": "2025-12-25T09:00:00Z",
+      "isRegistrationOpen": true,
+      "formFields": [
+        {
+          "label": "Team Name",
+          "fieldType": "text",
+          "fieldName": "team_name",
+          "required": true
+        }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+#### Get Event by ID
+```
+GET /api/v1/events/:id
+```
+
+**Public** - No token required
+
+**Response (200 - OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "_id": "507f1f77bcf86cd799439013",
+    "name": "Hackathon 2025",
+    "description": "24-hour coding competition",
+    "formFields": [
+      {
+        "label": "Team Name",
+        "fieldType": "text",
+        "fieldName": "team_name",
+        "required": true
+      },
+      {
+        "label": "GitHub Link",
+        "fieldType": "text",
+        "fieldName": "github_url",
+        "required": false
+      }
+    ]
+  }
+}
+```
+
+---
+
+#### Register for Event
+```
+POST /api/v1/events/register
+Content-Type: multipart/form-data
+```
+
+**Protected** - Requires token
+
+**Request Body (Form Data):**
+```
+event_id: "507f1f77bcf86cd799439013"
+team_name: "CodeMasters"
+github_url: "https://github.com/example"
+resume: <file>
+```
+
+**Response (201 - Created):**
+```json
+{
+  "success": true,
+  "data": {
+    "_id": "507f1f77bcf86cd799439014",
+    "user": "507f1f77bcf86cd799439011",
+    "event": "507f1f77bcf86cd799439013",
+    "status": "pending",
+    "submissionData": {
+      "team_name": "CodeMasters",
+      "github_url": "https://github.com/example",
+      "resume_url": "uploads/resume-123.pdf"
+    },
+    "createdAt": "2025-12-24T10:00:00Z"
+  },
+  "message": "Registration successful"
+}
+```
+
+---
+
+#### Get My Registrations
+```
+GET /api/v1/events/registrations/me/:userId
+```
+
+**Protected** - Requires token
+
+**Response (200 - OK):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "_id": "507f1f77bcf86cd799439014",
+      "user": {
+        "_id": "507f1f77bcf86cd799439011",
+        "name": "John Doe"
+      },
+      "event": {
+        "_id": "507f1f77bcf86cd799439013",
+        "name": "Hackathon 2025"
+      },
+      "status": "pending",
+      "submissionData": {
+        "team_name": "CodeMasters"
+      },
+      "createdAt": "2025-12-24T10:00:00Z"
+    }
+  ]
+}
+```
+
+---
+
+#### Get Registration Details
+```
+GET /api/v1/events/registrations/:id
+```
+
+**Protected** - Requires token
+
+**Response (200 - OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "_id": "507f1f77bcf86cd799439014",
+    "user": "507f1f77bcf86cd799439011",
+    "event": "507f1f77bcf86cd799439013",
+    "status": "approved",
+    "submissionData": {
+      "team_name": "CodeMasters",
+      "github_url": "https://github.com/example"
+    }
+  }
+}
+```
+
+---
+
+#### Update Registration Submission
+```
+PUT /api/v1/events/registrations/:id/submission
+```
+
+**Protected** - Requires token
+
+**Request Body:**
+```json
+{
+  "submissionData": {
+    "github_url": "https://github.com/updated-link"
+  }
+}
+```
+
+**Response (200 - OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "_id": "507f1f77bcf86cd799439014",
+    "submissionData": {
+      "team_name": "CodeMasters",
+      "github_url": "https://github.com/updated-link"
+    }
+  },
+  "message": "Submission updated successfully"
+}
+```
+
+---
+
+### 4. ADMIN ROUTES
+
+All admin routes require `protect` middleware (token authentication).
+
+#### Create Event Category
+```
+POST /api/v1/admin/categories
+```
+
+**Authorized Roles**: admin, category_lead
+
+**Request Body:**
+```json
+{
+  "name": "Web Development",
+  "description": "All web development related events"
+}
+```
+
+**Response (201 - Created):**
+```json
+{
+  "success": true,
+  "data": {
+    "_id": "507f1f77bcf86cd799439012",
+    "name": "Web Development",
+    "description": "All web development related events",
+    "categoryLead": "507f1f77bcf86cd799439011"
+  }
+}
+```
+
+---
+
+#### Update Event Category
+```
+PUT /api/v1/admin/categories/:id
+```
+
+**Authorized Roles**: admin, category_lead (owner only)
+
+**Request Body:**
+```json
+{
+  "name": "Web Development 2025",
+  "description": "Updated description"
+}
+```
+
+**Response (200 - OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "_id": "507f1f77bcf86cd799439012",
+    "name": "Web Development 2025"
+  }
+}
+```
+
+---
+
+#### Create Event
+```
+POST /api/v1/admin/events
+```
+
+**Authorized Roles**: admin, category_lead
+
+**Request Body:**
+```json
+{
+  "name": "Hackathon 2025",
+  "description": "24-hour coding competition",
+  "slug": "hackathon-2025",
+  "categoryId": "507f1f77bcf86cd799439012",
+  "venue": "FET Main Hall",
+  "date": "2025-12-25T09:00:00Z",
+  "isRegistrationOpen": true,
+  "formFields": [
+    {
+      "label": "Team Name",
+      "fieldType": "text",
+      "fieldName": "team_name",
+      "required": true
+    },
+    {
+      "label": "GitHub Link",
+      "fieldType": "text",
+      "fieldName": "github_url",
+      "required": false
+    }
+  ]
+}
+```
+
+**Response (201 - Created):**
+```json
+{
+  "success": true,
+  "data": {
+    "_id": "507f1f77bcf86cd799439013",
+    "name": "Hackathon 2025",
+    "category": "507f1f77bcf86cd799439012",
+    "coordinators": [],
+    "volunteers": [],
+    "formFields": [...]
+  }
+}
+```
+
+---
+
+#### Update Event
+```
+PUT /api/v1/admin/events/:id
+```
+
+**Authorized Roles**: admin, category_lead, event_coordinator (owner)
+
+**Request Body:**
+```json
+{
+  "name": "Hackathon 2025 - Updated",
+  "isRegistrationOpen": false
+}
+```
+
+**Response (200 - OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "_id": "507f1f77bcf86cd799439013",
+    "name": "Hackathon 2025 - Updated"
+  }
+}
+```
+
+---
+
+#### Add Event Coordinator
+```
+POST /api/v1/admin/events/:id/coordinator
+```
+
+**Authorized Roles**: admin, category_lead
+
+**Request Body:**
+```json
+{
+  "userId": "507f1f77bcf86cd799439015"
+}
+```
+
+**Response (200 - OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "_id": "507f1f77bcf86cd799439013",
+    "coordinators": ["507f1f77bcf86cd799439015"]
+  },
+  "message": "Coordinator added successfully"
+}
+```
+
+---
+
+#### Get Registrations by Event
+```
+GET /api/v1/admin/registrations/event/:eventId
+```
+
+**Authorized Roles**: admin, event_coordinator (for their events)
+
+**Response (200 - OK):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "_id": "507f1f77bcf86cd799439014",
+      "user": {
+        "_id": "507f1f77bcf86cd799439011",
+        "name": "John Doe",
+        "email": "john@example.com"
+      },
+      "event": "507f1f77bcf86cd799439013",
+      "status": "pending",
+      "submissionData": {...}
+    }
+  ]
+}
+```
+
+---
+
+#### Update Registration Status
+```
+PUT /api/v1/admin/registrations/:id/status
+```
+
+**Authorized Roles**: admin, event_coordinator
+
+**Request Body:**
+```json
+{
+  "status": "approved"
+}
+```
+
+**Response (200 - OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "_id": "507f1f77bcf86cd799439014",
+    "status": "approved"
+  },
+  "message": "Registration status updated"
+}
+```
+
+---
+
+## Database Models
+
+### User Model
+
+```javascript
+{
+  name: String,
+  email: String (unique),
+  password: String (hashed),
+  contactNo: String,
+  whatsappNo: String,
+  college: String,
+  branch: String,
+  campus: String (enum: ["FET", "University", "KGC"]),
+  role: String (enum: ["student", "gkvian", "fetian", "faculty"]),
+  specialRoles: [String] (enum: ["admin", "event_coordinator", "volunteer", "category_lead", "finance_team", "None"]),
+  jnanagniId: String (unique),
+  isVerified: Boolean,
+  verificationToken: String,
+  verificationExpire: Date,
+  paymentStatus: String (enum: ["pending", "verified", "failed"]),
+  resetPasswordToken: String,
+  resetPasswordExpire: Date,
+  createdAt: Date,
+  updatedAt: Date
+}
+```
+
+### Event Model
+
+```javascript
+{
+  name: String,
+  description: String,
+  slug: String (unique),
+  category: ObjectId (ref: EventCategory),
+  coordinators: [ObjectId] (ref: User),
+  volunteers: [ObjectId] (ref: User),
+  formFields: [{
+    label: String,
+    fieldType: String (enum: ["text", "number", "email", "file", "dropdown"]),
+    fieldName: String,
+    required: Boolean,
+    options: [String]
+  }],
+  ruleset: String,
+  venue: String,
+  date: Date,
+  isRegistrationOpen: Boolean,
+  createdby: ObjectId (ref: User),
+  createdAt: Date,
+  updatedAt: Date
+}
+```
+
+### Registration Model
+
+```javascript
+{
+  user: ObjectId (ref: User),
+  event: ObjectId (ref: Event),
+  submissionData: Map,
+  status: String (enum: ["pending", "approved", "rejected"]),
+  createdAt: Date,
+  updatedAt: Date
+}
+```
+
+### EventCategory Model
+
+```javascript
+{
+  name: String,
+  description: String,
+  categoryLead: ObjectId (ref: User),
+  createdAt: Date,
+  updatedAt: Date
+}
+```
+
+---
+
+## Error Handling
+
+### Standard Error Response
+
+```json
+{
+  "success": false,
+  "message": "Error description",
+  "statusCode": 400
+}
+```
+
+### Common Error Codes
+
+| Code | Message | Description |
+|------|---------|-------------|
+| 400 | Bad Request | Invalid request data |
+| 401 | Unauthorized | Missing or invalid token |
+| 403 | Forbidden | User not authorized for this action |
+| 404 | Not Found | Resource not found |
+| 409 | Conflict | Resource already exists (e.g., email) |
+| 500 | Server Error | Internal server error |
+
+---
+
+## Running the Server
+
+### Development Mode
+```bash
+cd /srv/containers/jnanagni-full/node
+pnpm dev
+```
+
+The server will start on `http://localhost:8001` with hot reload enabled.
+
+### Production Mode
+```bash
+cd /srv/containers/jnanagni-full/node
+pnpm start
+```
+
+### Docker Setup
+
+```dockerfile
+FROM node:18-alpine
+WORKDIR /app
+COPY package.json pnpm-lock.yaml ./
+RUN npm install -g pnpm && pnpm install
+COPY . .
+EXPOSE 8001
+CMD ["pnpm", "start"]
+```
+
+**Run with Docker Compose:**
+```yaml
+services:
+  backend:
+    build: ./node
+    ports:
+      - "8001:8001"
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017/jnanagni
+      - JWT_SECRET=secret-key
+    depends_on:
+      - mongodb
+    volumes:
+      - ./node:/app
+      - /app/node_modules
+```
+
+---
+
+## Testing Endpoints
+
+Use tools like:
+- **Postman**: Import API collection
+- **Thunder Client**: VS Code extension
+- **cURL**: Command-line testing
+
+### Example cURL Request
+
+```bash
+# Register
+curl -X POST http://localhost:8001/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "John Doe",
+    "email": "john@example.com",
+    "password": "SecurePass123!",
+    "contactNo": "+91-9876543210",
+    "whatsappNo": "+91-9876543210",
+    "college": "Delhi University",
+    "branch": "CS",
+    "campus": "FET"
+  }'
+
+# Login
+curl -X POST http://localhost:8001/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "john@example.com",
+    "password": "SecurePass123!"
+  }'
+
+# Get current user (Protected)
+curl -X GET http://localhost:8001/api/v1/auth/me \
+  -H "Authorization: Bearer <JWT_TOKEN>"
+```
+
+---
+
+## Support & Contact
+
+For issues or questions:
+- Create an issue in the repository
+- Contact: devraj@blackbirdcodelabs.com
+
+---
+
+**Last Updated**: December 24, 2025
 - **Authorization**: None (Public)
 - **Body Required**: Yes
 - **Request Body**:
