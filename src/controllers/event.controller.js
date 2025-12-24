@@ -138,9 +138,9 @@ export const getAllEventCategories = async (req, res) => {
 
 export const createEvent = async (req, res) => {
   try {
-    const { title, description, date, venue, categoryId, coordinatorId } = req.body;
+    const { name, description, date, time, venue, categoryId, coordinatorId, maxParticipants, prize, images, formFields, ruleset } = req.body;
 
-    let slug = title.toLowerCase().replace(/ /g, "-").replace(/[^\w-]+/g, "");
+    let slug = name.toLowerCase().replace(/ /g, "-").replace(/[^\w-]+/g, "");
     let uniqueSlug = slug;
     let counter = 1;
     while (await Event.findOne({ slug: uniqueSlug })) {
@@ -149,12 +149,19 @@ export const createEvent = async (req, res) => {
     }
 
     const newEvent = await Event.create({
-      name: title,
+      name,
       description,
       slug: uniqueSlug,
       date,
+      time,
       venue,
       category: categoryId,
+      maxParticipants: maxParticipants || null,
+      prize: prize || null,
+      images: images || [],
+      formFields: formFields || [],
+      ruleset: ruleset || "",
+      isRegistrationOpen: true,
       createdby: req.user._id,
     });
 
@@ -162,7 +169,7 @@ export const createEvent = async (req, res) => {
     if (coordinatorId) {
       newEvent.coordinators.push(coordinatorId);
       await newEvent.save();
-      await assignRoleAndNotify(coordinatorId, "event_coordinator", title, "Event");
+      await assignRoleAndNotify(coordinatorId, "event_coordinator", name, "Event");
     }
 
     res.status(201).json(newEvent);

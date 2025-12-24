@@ -57,6 +57,10 @@ const eventSchema = new Schema(
     // Standard details
     venue: String,
     date: Date,
+    time: String,
+    maxParticipants: Number,
+    prize: String,
+    images: [String],
     isRegistrationOpen: { type: Boolean, default: true },
     createdby: {
       type: Schema.Types.ObjectId,
