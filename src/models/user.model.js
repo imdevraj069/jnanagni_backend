@@ -19,7 +19,7 @@ const userSchema = new Schema(
     // Academic Fields
     college: { type: String, trim: true },
     branch: { type: String, trim: true },
-    campus: { type: String, enum: ["FET", "University", "KGC"], trim: true },
+    campus: { type: String, enum: ["FET", "University", "KGC", "null",''],default: "null", trim: true },
 
     password: { type: String, required: true },
 
@@ -55,8 +55,8 @@ const userSchema = new Schema(
 
     paymentStatus: {
       type: String,
-      enum: ["pending", "verified", "failed"],
-      default: "pending",
+      enum: ["none", "pending", "verified", "failed"],
+      default: "none",
     },
 
     resetPasswordToken: String,

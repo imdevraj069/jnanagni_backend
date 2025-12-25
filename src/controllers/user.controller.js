@@ -181,12 +181,19 @@ export const getUnverifiedUsers = asyncHandler(async (req, res) => {
 });
 
 export const getUserUnverifiedPayments = asyncHandler(async (req, res) => {
-    const users = await user.find({ paymentStatus: false }).select("-password -resetPasswordToken -__v");
+  const users = await user
+    .find({ paymentStatus: { $ne: "verified" } })
+    .select("-password -resetPasswordToken -__v");
 
-    res.status(200).json(
-        new ApiResponse(200, users, "Users with unverified payments fetched successfully")
-    );
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      users,
+      "Users with unverified payments fetched successfully"
+    )
+  );
 });
+
 
 export const verifyUserPayment = asyncHandler(async (req, res) => {
     const { id } = req.params;
