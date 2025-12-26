@@ -33,13 +33,13 @@ const eventSchema = new Schema(
 
     // --- DYNAMIC FORM CONFIGURATION ---
     // This defines what the frontend needs to render
-    // Example: [ { type: 'text', label: 'Team Name', name: 'team_name' }, { type: 'file', label: 'Resume', name: 'resume_url' } ]
-    formFields: [
+    // Example: [ { fieldType: 'text', fieldLabel: 'Team Name', fieldName: 'team_name' }, { fieldType: 'file', fieldLabel: 'Resume', fieldName: 'resume_url' } ]
+    customFields: [
       {
-        label: String, // e.g., "GitHub Link"
+        fieldLabel: String, // e.g., "GitHub Link"
         fieldType: {
           type: String,
-          enum: ["text", "number", "email", "file", "dropdown"],
+          enum: ["text", "number", "email", "tel", "url", "textarea", "select", "checkbox", "file"],
           default: "text",
         },
         fieldName: String, // key for the database, e.g., "github_url"

@@ -138,7 +138,7 @@ export const getAllEventCategories = async (req, res) => {
 
 export const createEvent = async (req, res) => {
   try {
-    const { name, description, date, time, venue, categoryId, coordinatorId, maxParticipants, prize, images, formFields, ruleset } = req.body;
+    const { name, description, date, time, venue, categoryId, coordinatorId, maxParticipants, prize, images, customFields, ruleset, coordinatorIds, volunteerIds } = req.body;
 
     let slug = name.toLowerCase().replace(/ /g, "-").replace(/[^\w-]+/g, "");
     let uniqueSlug = slug;
@@ -159,17 +159,30 @@ export const createEvent = async (req, res) => {
       maxParticipants: maxParticipants || null,
       prize: prize || null,
       images: images || [],
-      formFields: formFields || [],
+      customFields: customFields && customFields.length > 0 ? customFields.map(f => ({
+        fieldLabel: f.fieldLabel,
+        fieldType: f.fieldType,
+        fieldName: f.fieldName,
+        required: f.required || false,
+        options: f.options || [],
+      })) : [],
       ruleset: ruleset || "",
       isRegistrationOpen: true,
       createdby: req.user._id,
+      coordinators: coordinatorIds || (coordinatorId ? [coordinatorId] : []),
+      volunteers: volunteerIds || [],
     });
 
-    // If coordinator is provided, assign them
-    if (coordinatorId) {
-      newEvent.coordinators.push(coordinatorId);
-      await newEvent.save();
-      await assignRoleAndNotify(coordinatorId, "event_coordinator", name, "Event");
+    // Assign coordinators and send notifications
+    const allCoordinators = coordinatorIds || (coordinatorId ? [coordinatorId] : []);
+    for (const coordId of allCoordinators) {
+      await assignRoleAndNotify(coordId, "event_coordinator", name, "Event");
+    }
+
+    // Assign volunteers and send notifications
+    const allVolunteers = volunteerIds || [];
+    for (const volId of allVolunteers) {
+      await assignRoleAndNotify(volId, "event_volunteer", name, "Event");
     }
 
     res.status(201).json(newEvent);
