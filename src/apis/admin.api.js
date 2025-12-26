@@ -133,4 +133,79 @@ adminRouter.delete(
     deleteRegistration
 );
 
+// ==========================================
+// ROLE-LIMITED DATA ACCESS ROUTES
+// ==========================================
+
+// Get categories limited to lead (lead can see only his categories)
+adminRouter.get(
+    '/my-categories', 
+    authorize('admin', 'category_lead'),
+    async (req, res) => {
+        try {
+            const categories = await (await import("../models/eventcategory.model.js")).EventCategory
+                .find({ lead: req.user._id })
+                .populate("lead", "name email jnanagniId")
+                .populate("createdby", "name email");
+            res.status(200).json(categories);
+        } catch (error) {
+            res.status(500).json({ message: "Error fetching categories", error });
+        }
+    }
+);
+
+// Get events limited to coordinator (coordinator can see only his events)
+adminRouter.get(
+    '/my-events', 
+    authorize('admin', 'category_lead', 'event_coordinator'),
+    async (req, res) => {
+        try {
+            const Event = (await import("../models/event.model.js")).Event;
+            const events = await Event
+                .find({
+                    $or: [
+                        { coordinators: req.user._id },
+                        { category: { $in: (await (await import("../models/eventcategory.model.js")).EventCategory.find({ lead: req.user._id })).map(c => c._id) } }
+                    ]
+                })
+                .populate("category", "name")
+                .populate("coordinators", "name email jnanagniId")
+                .populate("volunteers", "name email jnanagniId");
+            res.status(200).json(events);
+        } catch (error) {
+            res.status(500).json({ message: "Error fetching events", error });
+        }
+    }
+);
+
+// Get registrations limited to volunteer (volunteer can see only his event registrations)
+adminRouter.get(
+    '/my-registrations', 
+    authorize('admin', 'volunteer', 'event_coordinator', 'category_lead'),
+    async (req, res) => {
+        try {
+            const Registration = (await import("../models/registration.model.js")).Registration;
+            const Event = (await import("../models/event.model.js")).Event;
+            
+            // Get events where user is volunteer/coordinator
+            const events = await Event.find({
+                $or: [
+                    { volunteers: req.user._id },
+                    { coordinators: req.user._id }
+                ]
+            });
+            
+            const eventIds = events.map(e => e._id);
+            const registrations = await Registration
+                .find({ event: { $in: eventIds } })
+                .populate("user", "name email jnanagniId")
+                .populate("event", "name");
+            
+            res.status(200).json(registrations);
+        } catch (error) {
+            res.status(500).json({ message: "Error fetching registrations", error });
+        }
+    }
+);
+
 export { adminRouter };
