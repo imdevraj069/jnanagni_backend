@@ -14,6 +14,22 @@ const eventSchema = new Schema(
       required: true,
     },
 
+    // --- NEW: Participation Configuration ---
+    participationType: {
+      type: String,
+      enum: ["solo", "group"],
+      default: "solo",
+      required: true
+    },
+    minTeamSize: {
+      type: Number,
+      default: 1
+    },
+    maxTeamSize: {
+      type: Number,
+      default: 1
+    },
+
     // --- ACCESS CONTROL ---
     // Coordinators: Can EDIT this specific event
     coordinators: [

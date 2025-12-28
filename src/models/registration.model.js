@@ -14,6 +14,17 @@ const registrationSchema = new Schema(
       required: true,
     },
 
+    // --- NEW: Group Details ---
+    teamName: { 
+      type: String, 
+      trim: true 
+    },
+    // List of OTHER team members (excluding the leader user above)
+    teamMembers: [{
+      type: Schema.Types.ObjectId,
+      ref: "User"
+    }],
+
     submissionData: {
       type: Map,
       of: Schema.Types.Mixed, // Allows strings, numbers, arrays etc.

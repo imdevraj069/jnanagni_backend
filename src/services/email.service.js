@@ -63,3 +63,19 @@ export const sendRoleAssignmentEmail = async (user, role, contextName, contextTy
     html: html
   });
 }
+
+// src/services/email.service.js (Add this function)
+export const sendRegistrationConfirmation = async (user, eventName) => {
+  // Simple text email for now, you can create a template later
+  await transporter.sendMail({
+    from: `"Jnanagni Events" <${process.env.EMAIL_USER}>`,
+    to: user.email,
+    subject: `Registration Confirmed: ${eventName}`,
+    html: `
+      <h2>Registration Successful!</h2>
+      <p>Namaste ${user.name},</p>
+      <p>You have successfully registered for <strong>${eventName}</strong>.</p>
+      <p>Visit your dashboard to view details and status.</p>
+    `
+  });
+};
