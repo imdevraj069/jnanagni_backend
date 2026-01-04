@@ -52,7 +52,8 @@ export const register = asyncHandler(async (req, res) => {
     campus,
     role: userRole,         // Primary Role (e.g., student)
     specialRoles: specialRoles, // Special Role (e.g., admin or None)
-    jnanagniId: uniqueId 
+    jnanagniId: uniqueId,
+    isVerified: true // Set to true for testing purposes
   });
 
   // Generate Verification Token
@@ -60,14 +61,14 @@ export const register = asyncHandler(async (req, res) => {
   await newUser.save();
 
   // Send Verification Email
-  try {
-    await sendVerificationEmail(email, name, uniqueId, verificationToken);
-  } catch (error) {
-    console.error("Email failed:", error);
-    // delete user if email fails
-    await user.deleteOne({ _id: newUser._id });
-    throw new ApiError(500, "Failed to send verification email. Please try again.");
-  }
+  // try {
+  //   await sendVerificationEmail(email, name, uniqueId, verificationToken);
+  // } catch (error) {
+  //   console.error("Email failed:", error);
+  //   // delete user if email fails
+  //   await user.deleteOne({ _id: newUser._id });
+  //   throw new ApiError(500, "Failed to send verification email. Please try again.");
+  // }
 
   res.status(201).json(
     new ApiResponse(201, { jnanagniId: uniqueId }, "Registration successful. Please check your email to verify account.")

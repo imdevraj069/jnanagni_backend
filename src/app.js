@@ -20,7 +20,7 @@ import { authRouter } from "./apis/auth.api.js";
 import { userRouter } from "./apis/user.api.js";
 import { eventRouter } from "./apis/event.api.js"; // Import Event Router
 import { adminRouter } from "./apis/admin.api.js"; // Import Admin Router
-// import { seedRouter } from "./apis/seed.api.js";
+import { seedRouter } from "./apis/seed.api.js";
 
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------
 // | Express Application Initialization
