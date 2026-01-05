@@ -32,7 +32,7 @@ eventRouter.get('/categories/:id', getEventCategoryById);
 
 // --- Events ---
 eventRouter.get('/', getAllEvents);
-eventRouter.get('/:id', getEventById);
+eventRouter.get('/find/:id', getEventById);
 eventRouter.get('/category/:categoryId', getEventsByCategory);
 
 

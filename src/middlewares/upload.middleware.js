@@ -12,15 +12,15 @@ const createDir = (dir) => {
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    // let uploadPath = "src/uploads/others"; // Default
-    let uploadPath = path.join(process.cwd(), "src/uploads/others");
+    let uploadPath = "src/uploads/others"; // Default
+    // let uploadPath = path.join(process.cwd(), "src/uploads/others");
 
     if (file.fieldname === "poster" || file.fieldname === "banner" || file.fieldname === "images") {
-        // uploadPath = "src/uploads/images";
-        uploadPath = path.join(process.cwd(), "src/uploads/images");
+        uploadPath = "src/uploads/images";
+        // uploadPath = path.join(process.cwd(), "src/uploads/images");
     } else if (file.fieldname === "rulesetFile") {
-        // uploadPath = "src/uploads/rulesets";
-        uploadPath = path.join(process.cwd(), "src/uploads/rulesets");
+        uploadPath = "src/uploads/rulesets";
+        // uploadPath = path.join(process.cwd(), "src/uploads/rulesets");
     }
 
     createDir(uploadPath);
