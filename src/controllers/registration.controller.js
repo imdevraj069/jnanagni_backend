@@ -270,19 +270,22 @@ export const deleteRegistration = asyncHandler(async (req, res) => {
 export const getMyInvites = asyncHandler(async (req, res) => {
   const user = req.user;
 
-  // Find registrations where this user is in teamMembers with status 'pending'
-  const invites = await Registration.find({
-    teamMembers: {
-      $elemMatch: {
-        $or: [{ user: user._id }, { email: user.email }],
-        status: "pending",
+  try {
+    const invites = await Registration.find({
+      teamMembers: {
+        $elemMatch: {
+          $or: [{ user: user._id }, { email: user.email }],
+          status: "pending",
+        },
       },
-    },
-  })
-    .populate("registeredBy", "name")
-    .populate("event", "name date");
+    })
+      .populate("registeredBy", "name email")
+      .populate("event", "name date venue");
 
-  res.status(200).json(invites);
+    res.status(200).json(invites);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching invites", error });
+  }
 });
 
 export const getRegistrationsByEvent = async (req, res) => {
@@ -339,10 +342,25 @@ export const updateRegistrationStatus = async (req, res) => {
 export const getRegistrationsByUser = async (req, res) => {
   try {
     const userId = req.params.userId;
-    const registrations = await Registration.find({ user: userId }).populate(
-      "event",
-      "title date venue"
-    );
+    // Find registrations where user is either the leader OR an accepted team member
+    const registrations = await Registration.find({
+      $or: [
+        { registeredBy: userId },
+        { 
+          teamMembers: { 
+            $elemMatch: { 
+              user: userId, 
+              status: "accepted" 
+            } 
+          }
+        }
+      ],
+      status: "active"
+    })
+      .populate("registeredBy", "name email")
+      .populate("event", "title date venue maxTeamSize")
+      .populate("teamMembers.user", "name email jnanagniId");
+    
     res.status(200).json(registrations);
   } catch (error) {
     res
