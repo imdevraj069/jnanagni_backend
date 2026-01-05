@@ -19,6 +19,7 @@ const EventCategorySchema = new Schema(
       required: true,
     },
     description: String,
+    banner:{ type: String }, // Path to banner image
     createdby: {
       type: Schema.Types.ObjectId,
       ref: "User",

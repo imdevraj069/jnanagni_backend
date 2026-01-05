@@ -4,6 +4,7 @@ import { getWelcomeTemplate } from '../templates/welcomeEmail.js';
 import { getOtpTemplate } from '../templates/otpEmail.js';
 // We will use one flexible template for all role assignments
 import { getRoleAssignmentTemplate } from '../templates/roleAssignmentEmail.js';
+import { getTeamInviteTemplate } from '../templates/teamInviteEmail.js';
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -63,19 +64,37 @@ export const sendRoleAssignmentEmail = async (user, role, contextName, contextTy
     html: html
   });
 }
+// --- NEW FUNCTION: Send Team Invitation ---
+export const sendTeamInviteEmail = async (email, inviterName, teamName, eventName) => {
+  const html = getTeamInviteTemplate(inviterName, teamName, eventName);
 
-// src/services/email.service.js (Add this function)
-export const sendRegistrationConfirmation = async (user, eventName) => {
-  // Simple text email for now, you can create a template later
+  await transporter.sendMail({
+    from: `"Jnanagni Events" <${process.env.EMAIL_USER}>`,
+    to: email,
+    subject: `Team Invitation: Join "${teamName}" for ${eventName}`,
+    html: html
+  });
+};
+
+// --- UPDATE: Registration Confirmation (Enhanced) ---
+export const sendRegistrationConfirmation = async (user, eventName, teamName = null) => {
+  const subject = teamName 
+    ? `Team Registered: ${teamName} for ${eventName}`
+    : `Registration Confirmed: ${eventName}`;
+
+  const message = teamName
+    ? `You have successfully created the team <strong>${teamName}</strong> for <strong>${eventName}</strong>. You can now invite members from your dashboard.`
+    : `You have successfully registered for <strong>${eventName}</strong>.`;
+
   await transporter.sendMail({
     from: `"Jnanagni Events" <${process.env.EMAIL_USER}>`,
     to: user.email,
-    subject: `Registration Confirmed: ${eventName}`,
+    subject: subject,
     html: `
       <h2>Registration Successful!</h2>
       <p>Namaste ${user.name},</p>
-      <p>You have successfully registered for <strong>${eventName}</strong>.</p>
-      <p>Visit your dashboard to view details and status.</p>
+      <p>${message}</p>
+      <p>Visit your dashboard to view details.</p>
     `
   });
 };

@@ -1,9 +1,9 @@
-// models/registration.model.js
 import mongoose, { Schema } from "mongoose";
 
 const registrationSchema = new Schema(
   {
-    user: {
+    // The "Owner" of the registration (Solo User or Team Leader)
+    registeredBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
@@ -14,32 +14,41 @@ const registrationSchema = new Schema(
       required: true,
     },
 
-    // --- NEW: Group Details ---
-    teamName: { 
-      type: String, 
-      trim: true 
-    },
-    // List of OTHER team members (excluding the leader user above)
-    teamMembers: [{
-      type: Schema.Types.ObjectId,
-      ref: "User"
-    }],
+    // --- Group Logic ---
+    teamName: { type: String, trim: true },
+    
+    // Team Members (Excluding Leader)
+    teamMembers: [
+        {
+            user: { type: Schema.Types.ObjectId, ref: "User" }, // Linked when accepted
+            email: { type: String }, // Used for invitation
+            status: { 
+                type: String, 
+                enum: ['pending', 'accepted', 'rejected'], 
+                default: 'pending' 
+            },
+            invitedAt: { type: Date, default: Date.now },
+            submissionData: { type: Map, of: Schema.Types.Mixed } // Member specific data
+        }
+    ],
 
+    // Data filled by the Leader (or Solo user)
     submissionData: {
       type: Map,
-      of: Schema.Types.Mixed, // Allows strings, numbers, arrays etc.
+      of: Schema.Types.Mixed,
     },
 
+    // Overall Status (e.g. if Admin disqualifies the whole team)
     status: {
       type: String,
-      enum: ["pending", "approved", "rejected"],
-      default: "pending",
+      enum: ["active", "cancelled", "disqualified"],
+      default: "active",
     },
   },
   { timestamps: true }
 );
 
-// Prevent duplicate registration
-registrationSchema.index({ user: 1, event: 1 }, { unique: true });
+// Index to ensure a User is not a Leader in multiple active teams for same event
+registrationSchema.index({ registeredBy: 1, event: 1 }, { unique: true });
 
 export const Registration = mongoose.model("Registration", registrationSchema);

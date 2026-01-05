@@ -3,22 +3,19 @@ import { EventCategory } from "../models/eventcategory.model.js";
 import User from "../models/user.model.js";
 import { sendRoleAssignmentEmail } from "../services/email.service.js";
 
-// Helper function to update role and send email
+// Helper: Update role and send email
 const assignRoleAndNotify = async (userId, role, contextName, contextType) => {
   if (!userId) return;
 
   const user = await User.findById(userId);
   if (!user) return;
 
-  // 1. Update Special Role if not present
   if (!user.specialRoles.includes(role)) {
     user.specialRoles.push(role);
-    // Remove 'None' if it exists
     user.specialRoles = user.specialRoles.filter((r) => r !== "None");
     await user.save();
   }
 
-  // 2. Send Email Notification
   try {
     await sendRoleAssignmentEmail(user, role, contextName, contextType);
   } catch (error) {
@@ -26,17 +23,34 @@ const assignRoleAndNotify = async (userId, role, contextName, contextType) => {
   }
 };
 
-//  ---- Event Category Controllers ---- //
+// Helper: Parse JSON from FormData strings
+const parseJSON = (data) => {
+  if (!data) return [];
+  if (typeof data === 'string') {
+    try {
+      return JSON.parse(data);
+    } catch (e) {
+      console.error("JSON Parse error:", e);
+      return [];
+    }
+  }
+  return data;
+};
+
+//  ---- Event Category Controllers (Unchanged) ---- //
 
 export const createEventCategory = async (req, res) => {
   try {
     const { name, description, leaduserId } = req.body;
+    console.log("Creating Event Category with data:", req.body);
+    
+    // Handle Banner Upload
+    let bannerPath = null;
+    if (req.file && req.file.fieldname === 'banner') {
+        bannerPath = req.file.path;
+    }
 
-    // 1. Generate Slug
-    let slug = name
-      .toLowerCase()
-      .replace(/ /g, "-")
-      .replace(/[^\w-]+/g, "");
+    let slug = name.toLowerCase().replace(/ /g, "-").replace(/[^\w-]+/g, "");
     let uniqueSlug = slug;
     let counter = 1;
     while (await EventCategory.findOne({ slug: uniqueSlug })) {
@@ -44,16 +58,15 @@ export const createEventCategory = async (req, res) => {
       counter++;
     }
 
-    // 2. Create the Category
     const newCategory = await EventCategory.create({
       name,
       description,
       slug: uniqueSlug,
       lead: leaduserId,
+      banner: bannerPath, // Save Banner
       createdby: req.user._id,
     });
 
-    // 3. Update User Role & Send Email
     if (leaduserId) {
       await assignRoleAndNotify(leaduserId, "category_lead", name, "Category");
     }
@@ -65,7 +78,6 @@ export const createEventCategory = async (req, res) => {
   }
 };
 
-// ... (getAllEventCategories, getEventCategoryById, updateEventCategory, deleteEventCategory remain unchanged) ...
 export const getAllEventCategories = async (req, res) => {
   try {
     const categories = await EventCategory.find()
@@ -83,9 +95,7 @@ export const getEventCategoryById = async (req, res) => {
     const category = await EventCategory.findById(categoryId)
       .populate("lead", "name email")
       .populate("createdby", "name email");
-    if (!category) {
-      return res.status(404).json({ message: "Event category not found" });
-    }
+    if (!category) return res.status(404).json({ message: "Event category not found" });
     res.status(200).json(category);
   } catch (error) {
     res.status(500).json({ message: "Error fetching event category", error });
@@ -95,28 +105,19 @@ export const getEventCategoryById = async (req, res) => {
 export const updateEventCategory = async (req, res) => {
   try {
     const categoryId = req.params.id;
-    const updates = req.body;
+    const updates = { ...req.body };
 
-    // If lead is being changed, we might want to logic to demote the old lead,
-    // but usually we just promote the new one.
-    // For now, let's just handle the new lead promotion.
+    // Handle Banner Update
+    if (req.file && req.file.fieldname === 'banner') {
+        updates.banner = req.file.path;
+    }
+
     if (updates.lead) {
-      await assignRoleAndNotify(
-        updates.lead,
-        "category_lead",
-        updates.name || "Updated Category",
-        "Category"
-      );
+      await assignRoleAndNotify(updates.lead, "category_lead", updates.name || "Updated Category", "Category");
     }
 
-    const updatedCategory = await EventCategory.findByIdAndUpdate(
-      categoryId,
-      updates,
-      { new: true }
-    );
-    if (!updatedCategory) {
-      return res.status(404).json({ message: "Event category not found" });
-    }
+    const updatedCategory = await EventCategory.findByIdAndUpdate(categoryId, updates, { new: true });
+    if (!updatedCategory) return res.status(404).json({ message: "Event category not found" });
     res.status(200).json(updatedCategory);
   } catch (error) {
     res.status(500).json({ message: "Error updating event category", error });
@@ -126,28 +127,36 @@ export const updateEventCategory = async (req, res) => {
 export const deleteEventCategory = async (req, res) => {
   try {
     const categoryId = req.params.id;
-
     const existingEventsCount = await Event.countDocuments({ category: categoryId });
     if (existingEventsCount > 0) {
-      return res.status(400).json({ 
-        message: `Cannot delete category. It contains ${existingEventsCount} events. Please delete or move them first.` 
+      return res.status(400).json({
+        message: `Cannot delete category. It contains ${existingEventsCount} events. Please delete or move them first.`,
       });
     }
-
     const deletedCategory = await EventCategory.findByIdAndDelete(categoryId);
-    if (!deletedCategory) {
-      return res.status(404).json({ message: "Event category not found" });
-    }
+    if (!deletedCategory) return res.status(404).json({ message: "Event category not found" });
     res.status(200).json({ message: "Event category deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: "Error deleting event category", error });
   }
 };
 
-//  ---- Event Controllers ---- //
+//  ---- Event Controllers (UPDATED) ---- //
 
 export const createEvent = async (req, res) => {
   try {
+    // 1. Handle File Paths
+    let posterPath = null;
+    let rulesetFilePath = null;
+    
+    if (req.files) {
+        if (req.files.poster) posterPath = req.files.poster[0].path;
+        if (req.files.rulesetFile) rulesetFilePath = req.files.rulesetFile[0].path;
+    }
+
+    // 2. Extract Body Fields
+    // Note: When using FormData, everything comes as strings. 
+    // We must use parseJSON for arrays/objects.
     const {
       name,
       description,
@@ -155,29 +164,33 @@ export const createEvent = async (req, res) => {
       time,
       venue,
       categoryId,
-      coordinatorId,
-      maxParticipants,
-      prize,
-      images,
-      customFields,
-      ruleset,
-      coordinatorIds,
-      volunteerIds,
+      rulesetUrl,
       participationType,
       minTeamSize,
-      maxTeamSize
+      maxTeamSize,
+      maxRegistrations,
+      coordinatorIds, // Expecting JSON string for array
+      volunteerIds,   // Expecting JSON string for array
+      customFields,   // Expecting JSON string for array
+      registrationFields,
+      memberFields
     } = req.body;
 
-    let slug = name
-      .toLowerCase()
-      .replace(/ /g, "-")
-      .replace(/[^\w-]+/g, "");
+    // 3. Generate Slug
+    let slug = name.toLowerCase().replace(/ /g, "-").replace(/[^\w-]+/g, "");
     let uniqueSlug = slug;
     let counter = 1;
     while (await Event.findOne({ slug: uniqueSlug })) {
       uniqueSlug = `${slug}-${counter}`;
       counter++;
     }
+
+    // 4. Parse Arrays from JSON strings
+    const parsedCoordinators = parseJSON(coordinatorIds);
+    const parsedVolunteers = parseJSON(volunteerIds);
+    const parsedCustomFields = parseJSON(customFields);
+    const parsedRegistrationFields = parseJSON(registrationFields);
+    const parsedMemberFields = parseJSON(memberFields);
 
     const newEvent = await Event.create({
       name,
@@ -187,49 +200,114 @@ export const createEvent = async (req, res) => {
       time,
       venue,
       category: categoryId,
+      
+      // File & URL Fields
+      poster: posterPath,
+      rulesetFile: rulesetFilePath,
+      rulesetUrl: rulesetUrl || "",
+
+      // Logic Config
       participationType: participationType || "solo",
+      maxRegistrations: maxRegistrations || 0,
       minTeamSize: participationType === "group" ? (minTeamSize || 2) : 1,
       maxTeamSize: participationType === "group" ? (maxTeamSize || 5) : 1,
-      maxParticipants: maxParticipants || null,
-      prize: prize || null,
-      images: images || [],
-      customFields:
-        customFields && customFields.length > 0
-          ? customFields.map((f) => ({
-              fieldLabel: f.fieldLabel,
-              fieldType: f.fieldType,
-              fieldName: f.fieldName,
-              required: f.required || false,
-              options: f.options || [],
-            }))
-          : [],
-      ruleset: ruleset || "",
+      
+      // Form Config
+      registrationFields: parsedRegistrationFields,
+      memberFields: parsedMemberFields,
+      customFields: parsedCustomFields.map((f) => ({
+          fieldLabel: f.fieldLabel,
+          fieldType: f.fieldType,
+          fieldName: f.fieldName,
+          required: f.required || false,
+          options: f.options || [],
+      })),
+
       isRegistrationOpen: true,
       createdby: req.user._id,
-      coordinators: coordinatorIds || (coordinatorId ? [coordinatorId] : []),
-      volunteers: volunteerIds || [],
+      
+      // Access Control
+      coordinators: parsedCoordinators,
+      volunteers: parsedVolunteers,
     });
 
-    // Assign coordinators and send notifications
-    const allCoordinators =
-      coordinatorIds || (coordinatorId ? [coordinatorId] : []);
-    for (const coordId of allCoordinators) {
+    // 5. Assign Roles & Notify
+    for (const coordId of parsedCoordinators) {
       await assignRoleAndNotify(coordId, "event_coordinator", name, "Event");
     }
 
-    // Assign volunteers and send notifications
-    const allVolunteers = volunteerIds || [];
-    for (const volId of allVolunteers) {
-      await assignRoleAndNotify(volId, "event_volunteer", name, "Event");
+    for (const volId of parsedVolunteers) {
+      await assignRoleAndNotify(volId, "volunteer", name, "Event"); // Fixed role string to 'volunteer'
     }
 
     res.status(201).json(newEvent);
   } catch (error) {
-    res.status(500).json({ message: "Error creating event", error });
+    console.error("Create Event Error:", error);
+    res.status(500).json({ message: "Error creating event", error: error.message });
   }
 };
 
-// ... (getAllEvents, getEventById, getEventsByCategory remain unchanged) ...
+export const updateEvent = async (req, res) => {
+  try {
+    const eventId = req.params.id;
+    
+    // 1. Fetch Existing Event (Required for Role Diffing)
+    const existingEvent = await Event.findById(eventId);
+    if (!existingEvent) {
+      return res.status(404).json({ message: "Event not found" });
+    }
+
+    // 2. Prepare Updates Object
+    const updates = { ...req.body };
+
+    // Handle Files (Only update if new file provided)
+    if (req.files) {
+        if (req.files.poster) updates.poster = req.files.poster[0].path;
+        if (req.files.rulesetFile) updates.rulesetFile = req.files.rulesetFile[0].path;
+    }
+
+    // Handle JSON Parsing for FormData updates
+    if (updates.coordinatorIds) updates.coordinators = parseJSON(updates.coordinatorIds);
+    if (updates.volunteerIds) updates.volunteers = parseJSON(updates.volunteerIds);
+    if (updates.customFields) updates.customFields = parseJSON(updates.customFields);
+    if (updates.registrationFields) updates.registrationFields = parseJSON(updates.registrationFields);
+    if (updates.memberFields) updates.memberFields = parseJSON(updates.memberFields);
+
+    // 3. Perform Update
+    const updatedEvent = await Event.findByIdAndUpdate(eventId, updates, { new: true });
+
+    // 4. Role Assignment Logic (Diffing)
+    // Check for NEW Coordinators
+    if (updates.coordinators && Array.isArray(updates.coordinators)) {
+      const oldCoordIds = existingEvent.coordinators.map((id) => id.toString());
+      const newCoordIds = updates.coordinators.map((id) => id.toString());
+      
+      const addedCoordinators = newCoordIds.filter((id) => !oldCoordIds.includes(id));
+      for (const userId of addedCoordinators) {
+        await assignRoleAndNotify(userId, "event_coordinator", updatedEvent.name, "Event");
+      }
+    }
+
+    // Check for NEW Volunteers
+    if (updates.volunteers && Array.isArray(updates.volunteers)) {
+      const oldVolIds = existingEvent.volunteers.map((id) => id.toString());
+      const newVolIds = updates.volunteers.map((id) => id.toString());
+
+      const addedVolunteers = newVolIds.filter((id) => !oldVolIds.includes(id));
+      for (const userId of addedVolunteers) {
+        await assignRoleAndNotify(userId, "volunteer", updatedEvent.name, "Event");
+      }
+    }
+
+    res.status(200).json(updatedEvent);
+  } catch (error) {
+    console.error("Update Event Error:", error);
+    res.status(500).json({ message: "Error updating event", error: error.message });
+  }
+};
+
+// ... (getAllEvents, getEventById, getEventsByCategory, deleteEvent, addCoordinatorToEvent, addVolunteerToEvent remain unchanged) ...
+
 export const getAllEvents = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -301,9 +379,7 @@ export const getEventsByCategory = async (req, res) => {
       },
     });
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Error fetching events by category", error });
+    res.status(500).json({ message: "Error fetching events by category", error });
   }
 };
 
@@ -318,8 +394,7 @@ export const addCoordinatorToEvent = async (req, res) => {
     const existingEvent = await Event.findOne({ coordinators: coordinatorId });
     if (existingEvent) {
       return res.status(400).json({
-        message:
-          existingEvent._id.toString() === eventId
+        message: existingEvent._id.toString() === eventId
             ? "User is already a coordinator for this event"
             : "User is already a coordinator for another event",
       });
@@ -327,14 +402,7 @@ export const addCoordinatorToEvent = async (req, res) => {
 
     event.coordinators.push(coordinatorId);
     await event.save();
-
-    // Update Role & Notify
-    await assignRoleAndNotify(
-      coordinatorId,
-      "event_coordinator",
-      event.title,
-      "Event"
-    );
+    await assignRoleAndNotify(coordinatorId, "event_coordinator", event.name, "Event");
 
     res.status(200).json(event);
   } catch (error) {
@@ -356,9 +424,7 @@ export const addVolunteerToEvent = async (req, res) => {
 
     event.volunteers.push(volunteerId);
     await event.save();
-
-    // Update Role & Notify
-    await assignRoleAndNotify(volunteerId, "volunteer", event.title, "Event");
+    await assignRoleAndNotify(volunteerId, "volunteer", event.name, "Event");
 
     res.status(200).json({ message: "Volunteer added successfully", event });
   } catch (error) {
@@ -366,73 +432,17 @@ export const addVolunteerToEvent = async (req, res) => {
   }
 };
 
-// ... (deleteEvent, updateEvent remain unchanged) ...
 export const deleteEvent = async (req, res) => {
   try {
     const eventId = req.params.id;
-
     const deletedEvent = await Event.findByIdAndDelete(eventId);
-    if (!deletedEvent) {
-      return res.status(404).json({ message: "Event not found" });
-    }
+    if (!deletedEvent) return res.status(404).json({ message: "Event not found" });
 
-    // --- FIX: Cleanup Orphaned Registrations ---
     const { Registration } = await import("../models/registration.model.js");
     await Registration.deleteMany({ event: eventId });
-    // ------------------------------------------
 
     res.status(200).json({ message: "Event and associated registrations deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: "Error deleting event", error });
-  }
-};
-
-// src/controllers/event.controller.js
-
-export const updateEvent = async (req, res) => {
-  try {
-    const eventId = req.params.id;
-    const updates = req.body;
-
-    // 1. Fetch the EXISTING event state first
-    const existingEvent = await Event.findById(eventId);
-    if (!existingEvent) {
-      return res.status(404).json({ message: "Event not found" });
-    }
-
-    // 2. Perform the Update
-    const updatedEvent = await Event.findByIdAndUpdate(eventId, updates, {
-      new: true,
-    });
-
-    // 3. LOGIC FIX: Check for NEW Coordinators
-    if (updates.coordinators && Array.isArray(updates.coordinators)) {
-      const oldCoordIds = existingEvent.coordinators.map(id => id.toString());
-      const newCoordIds = updates.coordinators.map(id => id.toString());
-
-      // Find IDs that are in 'new' but NOT in 'old'
-      const addedCoordinators = newCoordIds.filter(id => !oldCoordIds.includes(id));
-
-      for (const userId of addedCoordinators) {
-        await assignRoleAndNotify(userId, "event_coordinator", updatedEvent.name, "Event");
-      }
-    }
-
-    // 4. LOGIC FIX: Check for NEW Volunteers
-    if (updates.volunteers && Array.isArray(updates.volunteers)) {
-      const oldVolIds = existingEvent.volunteers.map(id => id.toString());
-      const newVolIds = updates.volunteers.map(id => id.toString());
-
-      const addedVolunteers = newVolIds.filter(id => !oldVolIds.includes(id));
-
-      for (const userId of addedVolunteers) {
-        await assignRoleAndNotify(userId, "volunteer", updatedEvent.name, "Event");
-      }
-    }
-
-    res.status(200).json(updatedEvent);
-  } catch (error) {
-    console.error("Update Event Error:", error);
-    res.status(500).json({ message: "Error updating event", error });
   }
 };

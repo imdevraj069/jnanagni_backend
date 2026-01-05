@@ -10,6 +10,11 @@ import {
     registerForEvent, 
     getRegistrationsByUser, 
     getRegistrationById,
+    inviteMember,      // Imported
+    respondToInvite,   // Imported
+    removeMember,      // Imported
+    getMyInvites,      // Imported
+    deleteRegistration, // Imported
     updateRegistrationSubmissionData
 } from "../controllers/registration.controller.js";
 import { protect } from "../middlewares/auth.middleware.js";
@@ -35,13 +40,20 @@ eventRouter.get('/category/:categoryId', getEventsByCategory);
 // PROTECTED ROUTES (Student/User Actions)
 // ==========================================
 
-// Register for an event
+// 1. Main Register (Solo or Group Leader)
 eventRouter.post('/register', protect, upload.any(), registerForEvent);
 
-// Get my registrations
-eventRouter.get('/registrations/me/:userId', protect, getRegistrationsByUser); 
+// 2. Team Management (Leader Actions)
+eventRouter.post('/team/:registrationId/invite', protect, inviteMember);
+eventRouter.delete('/team/:registrationId/remove/:memberId', protect, removeMember);
+eventRouter.delete('/registrations/:id', protect, deleteRegistration); // Dissolve Team
 
-// Get specific registration details
+// 3. Member Actions
+eventRouter.get('/my-invites', protect, getMyInvites); // View pending invites
+eventRouter.post('/team/:registrationId/respond', protect, respondToInvite); // Accept/Reject
+
+// 4. View Data
+eventRouter.get('/registrations/me/:userId', protect, getRegistrationsByUser); 
 eventRouter.get('/registrations/:id', protect, getRegistrationById);
 
 // Update submission data (e.g., adding a github link later)

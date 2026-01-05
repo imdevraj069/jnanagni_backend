@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { protect } from "../middlewares/auth.middleware.js";
 import { authorize } from "../middlewares/access.middleware.js";
+import { getDashboardStats, getAnalyticsData } from "../controllers/admin.controller.js";
+import {upload} from "../middlewares/upload.middleware.js";
 
 // --- NEW IMPORT ---
 import { 
@@ -36,11 +38,18 @@ const adminRouter = Router();
 adminRouter.use(protect);
 
 // ==========================================
+// DASHBOARD ANALYTICS
+// ==========================================
+adminRouter.get('/stats/overview', authorize('admin', 'finance_team'), getDashboardStats);
+adminRouter.get('/stats/analytics', authorize('admin'), getAnalyticsData);
+
+// ==========================================
 // EVENT CATEGORY MANAGEMENT
 // ==========================================
 adminRouter.post(
     '/categories', 
-    authorize('admin', 'category_lead'), 
+    authorize('admin', 'category_lead'),
+    upload.single('banner'), // For category banner upload
     createEventCategory
 );
 
@@ -49,6 +58,7 @@ adminRouter.put(
     '/categories/:id', 
     authorize('admin', 'category_lead'), 
     verifyCategoryOwnership, // <--- Added
+    upload.single('banner'), // For category banner upload
     updateEventCategory
 );
 
@@ -63,11 +73,17 @@ adminRouter.delete(
 // EVENT MANAGEMENT
 // ==========================================
 
+const eventUploads = upload.fields([
+    { name: 'poster', maxCount: 1 }, 
+    { name: 'rulesetFile', maxCount: 1 }
+]);
+
 // Create: Ensure Category Lead owns the category they are adding an event to
 adminRouter.post(
     '/events', 
     authorize('admin', 'category_lead'), 
     verifyCategoryOwnership, // <--- Checks req.body.categoryId
+    eventUploads,
     createEvent
 );
 
@@ -76,6 +92,7 @@ adminRouter.put(
     '/events/:id', 
     authorize('admin', 'category_lead', 'event_coordinator'), 
     verifyEventAuthority, // <--- Added
+    eventUploads,
     updateEvent
 );
 

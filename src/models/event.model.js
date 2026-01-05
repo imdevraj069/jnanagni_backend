@@ -1,88 +1,54 @@
-// models/event.model.js
 import mongoose, { Schema } from "mongoose";
 
 const eventSchema = new Schema(
   {
+    // ... existing fields ...
     name: { type: String, required: true },
     description: { type: String, required: true },
     slug: { type: String, required: true, unique: true },
+    category: { type: Schema.Types.ObjectId, ref: "EventCategory", required: true },
 
-    // Link to the parent Category
-    category: {
-      type: Schema.Types.ObjectId,
-      ref: "EventCategory",
-      required: true,
-    },
-
-    // --- NEW: Participation Configuration ---
-    participationType: {
-      type: String,
-      enum: ["solo", "group"],
-      default: "solo",
-      required: true
-    },
-    minTeamSize: {
-      type: Number,
-      default: 1
-    },
-    maxTeamSize: {
-      type: Number,
-      default: 1
-    },
-
-    // --- ACCESS CONTROL ---
-    // Coordinators: Can EDIT this specific event
-    coordinators: [
+    // --- Media & Resources ---
+    poster: { type: String }, // Path to image file
+    images: [String],         // Additional gallery images
+    
+    // Ruleset can be a file download OR a google doc link
+    rulesetFile: { type: String }, // Path to PDF/Doc
+    rulesetUrl: { type: String },  // External Link
+    
+    // ... Participation Config (keep existing) ...
+    participationType: { type: String, enum: ["solo", "group"], default: "solo", required: true },
+    maxRegistrations: { type: Number, default: 0 },
+    minTeamSize: { type: Number, default: 1 },
+    maxTeamSize: { type: Number, default: 1 },
+    
+    // ... Forms & Access (keep existing) ...
+    registrationFields: [
       {
-        type: Schema.Types.ObjectId,
-        ref: "User",
-      },
-    ],
-
-    // Volunteers: Can VIEW details/registrations only
-    volunteers: [
-      {
-        type: Schema.Types.ObjectId,
-        ref: "User",
-      },
-    ],
-
-    // --- DYNAMIC FORM CONFIGURATION ---
-    // This defines what the frontend needs to render
-    // Example: [ { fieldType: 'text', fieldLabel: 'Team Name', fieldName: 'team_name' }, { fieldType: 'file', fieldLabel: 'Resume', fieldName: 'resume_url' } ]
-    customFields: [
-      {
-        fieldLabel: String, // e.g., "GitHub Link"
-        fieldType: {
-          type: String,
-          enum: ["text", "number", "email", "tel", "url", "textarea", "select", "checkbox", "file"],
-          default: "text",
-        },
-        fieldName: String, // key for the database, e.g., "github_url"
+        fieldLabel: String,
+        fieldType: { type: String, default: "text" },
+        fieldName: String,
         required: { type: Boolean, default: false },
-        options: [String], // For dropdowns, e.g., ["Solo", "Duo"]
+        options: [String],
       },
     ],
+    memberFields: [{
+        fieldLabel: String,
+        fieldType: { type: String, default: 'text' },
+        fieldName: String,
+        required: { type: Boolean, default: false },
+    }],
 
-    // Event Rules and Guidelines
-    ruleset: {
-      type: String,
-      default: "",
-    },
-
-    // Standard details
+    coordinators: [{ type: Schema.Types.ObjectId, ref: "User" }],
+    volunteers: [{ type: Schema.Types.ObjectId, ref: "User" }],
+    
+    // ... Standard Details (keep existing) ...
     venue: String,
     date: Date,
     time: String,
-    maxParticipants: Number,
     prize: String,
-    images: [String],
     isRegistrationOpen: { type: Boolean, default: true },
-    createdby: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
+    createdby: { type: Schema.Types.ObjectId, ref: "User", required: true },
   },
   { timestamps: true }
 );
