@@ -107,7 +107,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Serve files from the 'uploads' directory under the '/uploads' URL path
-app.use("/src/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------
 // | Health Check Route
