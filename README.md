@@ -1,17 +1,49 @@
-# Jnanagni Node.js Backend API Documentation
+# Jnanagni Backend API - Node.js/Express
 
-Complete API documentation for the Jnanagni event management system backend.
+A comprehensive REST API for the Jnanagni event management system built with Node.js, Express, MongoDB, and modern development practices.
 
-## Table of Contents
+## 📋 Table of Contents
 
-1. [Setup & Installation](#setup--installation)
-2. [Environment Variables](#environment-variables)
+1. [Overview](#overview)
+2. [Tech Stack](#tech-stack)
 3. [Project Structure](#project-structure)
-4. [Authentication](#authentication)
-5. [API Endpoints](#api-endpoints)
-6. [Database Models](#database-models)
-7. [Error Handling](#error-handling)
-8. [Running the Server](#running-the-server)
+4. [Setup & Installation](#setup--installation)
+5. [Environment Variables](#environment-variables)
+6. [Running the Server](#running-the-server)
+7. [Key Features](#key-features)
+8. [Authentication & Authorization](#authentication--authorization)
+9. [API Endpoints](#api-endpoints)
+10. [Database Models](#database-models)
+11. [Docker Deployment](#docker-deployment)
+
+---
+
+## Overview
+
+The Jnanagni backend provides a complete REST API for managing:
+
+- **User Management** - Registration, authentication, profiles, roles
+- **Event Management** - Create, update, browse events with categories
+- **Event Registration** - User event registration with custom forms
+- **Team Management** - Group event registrations with team invitations
+- **Admin Dashboard** - Manage events, categories, users, and registrations
+- **File Uploads** - Posters, rulesets, and submission files
+- **Email Services** - Verification, password reset, notifications
+- **Role-Based Access Control** - Different permissions for admin, coordinators, volunteers
+
+---
+
+## Tech Stack
+
+- **Framework**: Express.js (Node.js)
+- **Database**: MongoDB with Mongoose ODM
+- **Authentication**: JWT (JSON Web Tokens)
+- **File Upload**: Multer
+- **Email**: Nodemailer with custom templates
+- **Validation**: Custom middleware
+- **Error Handling**: Centralized error middleware
+- **Environment**: dotenv for configuration
+- **Package Manager**: pnpm
 
 ---
 
