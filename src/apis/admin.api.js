@@ -31,6 +31,10 @@ import {
     updateRegistrationStatus,
     deleteRegistration
 } from "../controllers/registration.controller.js";
+import {
+  getVolunteerRequestsByEvent,
+  updateVolunteerRequestStatus,
+} from "../controllers/volunteerRequest.controller.js";
 
 const adminRouter = Router();
 
@@ -223,6 +227,22 @@ adminRouter.get(
             res.status(500).json({ message: "Error fetching registrations", error });
         }
     }
+);
+
+// VOLUNTEER REQUEST MANAGEMENT
+// View volunteer requests for a specific event
+adminRouter.get(
+  "/events/:eventId/volunteer-requests",
+  authorize("admin", "categorylead", "eventcoordinator"),
+  verifyEventStaffAccess, // ensures lead/coord belong to the event
+  getVolunteerRequestsByEvent
+);
+
+// Update volunteer request status (approve/reject)
+adminRouter.put(
+  "/volunteer-requests/:id/status",
+  authorize("admin", "categorylead", "eventcoordinator"),
+  updateVolunteerRequestStatus
 );
 
 export { adminRouter };

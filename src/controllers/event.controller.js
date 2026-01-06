@@ -42,7 +42,6 @@ const parseJSON = (data) => {
 export const createEventCategory = async (req, res) => {
   try {
     const { name, description, leaduserId } = req.body;
-    console.log("Creating Event Category with data:", req.body);
     
     // Handle Banner Upload
     let bannerPath = null;
@@ -171,9 +170,10 @@ export const createEvent = async (req, res) => {
       maxRegistrations,
       coordinatorIds, // Expecting JSON string for array
       volunteerIds,   // Expecting JSON string for array
-      customFields,   // Expecting JSON string for array
+      // customFields,   // Expecting JSON string for array
       registrationFields,
-      memberFields
+      memberFields,
+      volunteerFields
     } = req.body;
 
     // 3. Generate Slug
@@ -188,9 +188,11 @@ export const createEvent = async (req, res) => {
     // 4. Parse Arrays from JSON strings
     const parsedCoordinators = parseJSON(coordinatorIds);
     const parsedVolunteers = parseJSON(volunteerIds);
-    const parsedCustomFields = parseJSON(customFields);
+    // const parsedCustomFields = parseJSON(customFields);
     const parsedRegistrationFields = parseJSON(registrationFields);
     const parsedMemberFields = parseJSON(memberFields);
+    const parsedVolunteerFields = parseJSON(volunteerFields);
+
 
     const newEvent = await Event.create({
       name,
@@ -215,13 +217,14 @@ export const createEvent = async (req, res) => {
       // Form Config
       registrationFields: parsedRegistrationFields,
       memberFields: parsedMemberFields,
-      customFields: parsedCustomFields.map((f) => ({
-          fieldLabel: f.fieldLabel,
-          fieldType: f.fieldType,
-          fieldName: f.fieldName,
-          required: f.required || false,
-          options: f.options || [],
-      })),
+      // customFields: parsedCustomFields.map((f) => ({
+      //     fieldLabel: f.fieldLabel,
+      //     fieldType: f.fieldType,
+      //     fieldName: f.fieldName,
+      //     required: f.required || false,
+      //     options: f.options || [],
+      // })),
+      volunteerFields: parsedVolunteerFields,
 
       isRegistrationOpen: true,
       createdby: req.user._id,

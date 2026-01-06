@@ -21,6 +21,7 @@ import { userRouter } from "./apis/user.api.js";
 import { eventRouter } from "./apis/event.api.js"; // Import Event Router
 import { adminRouter } from "./apis/admin.api.js"; // Import Admin Router
 import { seedRouter } from "./apis/seed.api.js";
+import volunteerRequestRouter from './apis/volunteerRequest.api.js';
 
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------
 // | Express Application Initialization
@@ -107,7 +108,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Serve files from the 'uploads' directory under the '/uploads' URL path
-app.use("/src/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------
 // | Health Check Route
@@ -133,6 +134,7 @@ app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/events", eventRouter); // Public & Student routes
 app.use("/api/v1/admin", adminRouter);   // Protected Management routes
+app.use('/api/v1/volunteer-requests', volunteerRequestRouter);
 // app.use("/api/v1/seed", seedRouter);
 
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------

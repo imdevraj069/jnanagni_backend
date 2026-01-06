@@ -174,52 +174,72 @@ export const inviteMember = asyncHandler(async (req, res) => {
 // 3. RESPOND TO INVITE (Member)
 // ==========================================
 export const respondToInvite = asyncHandler(async (req, res) => {
-  const { registrationId } = req.params;
-  const { status, submissionData } = req.body; // 'accepted' or 'rejected'
+  const registrationId = req.params.id;
+  const { status, submissionData } = req.body; // submissionData for memberFields
   const user = req.user;
 
-  if (!["accepted", "rejected"].includes(status))
-    throw new ApiError(400, "Invalid status.");
-  if (!submissionData)
-    throw new ApiError(400, "Submission data is required.");
+  if (!['accepted', 'rejected'].includes(status)) {
+    throw new ApiError(400, 'Invalid status');
+  }
 
-  const registration = await Registration.findById(registrationId).populate(
-    "event"
-  );
-  if (!registration) throw new ApiError(404, "Registration not found.");
+  if (!submissionData && status === 'accepted') {
+    throw new ApiError(400, 'Submission data is required');
+  }
 
-  // Check expiry or validity logic here if needed
+  const registration = await RegistrationModel.findById(registrationId).populate('event');
+
+  if (!registration) {
+    throw new ApiError(404, 'Registration not found');
+  }
 
   // Find the invite within the array
   const memberIndex = registration.teamMembers.findIndex(
-    (m) =>
-      (m.user && m.user.toString() === user._id.toString()) ||
-      m.email === user.email
+    (m) => m.user?.toString() === user.id.toString() || m.email === user.email
   );
+  
+  // verify if the team limit is not exceeded on acceptance
+  if (status === 'accepted') {
+    const event = await Event.findById(registration.event);
+    const currentSize =
+      1 + registration.teamMembers.filter((m) => m.status === "accepted").length; // Leader + Accepted
 
-  if (memberIndex === -1)
-    throw new ApiError(403, "You were not invited to this team.");
+      //  Check Team Size Limit
+    if (currentSize >= event.maxTeamSize) {
+      //  if team is already full
+      throw new ApiError(400, `Team limit reached (Max: ${event.maxTeamSize})`);
+    }
+  }
 
-  // Payment Check again (Safety)
-  if (user.paymentStatus !== "verified")
-    throw new ApiError(403, "Payment not verified.");
+  if (memberIndex === -1) {
+    throw new ApiError(403, 'You were not invited to this team');
+  }
+
+  // Payment check
+  if (user.paymentStatus !== 'verified') {
+    throw new ApiError(403, 'Payment not verified');
+  }
+
+  // Double check duplicate registration before accepting
+  if (status === 'accepted') {
+    await checkDuplicateRegistration(user.id, registration.event.id);
+  }
 
   // Update Status
   registration.teamMembers[memberIndex].status = status;
-  registration.teamMembers[memberIndex].user = user._id; // Ensure ID is linked
+  registration.teamMembers[memberIndex].user = user.id;
 
-  if (status === "accepted") {
-    // Double check duplicate registration just before saving
-    await checkDuplicateRegistration(user._id, registration.event._id);
-
-    // Save member specific form data
+  // STORE MEMBER SUBMISSION DATA (for memberFields)
+  if (status === 'accepted' && submissionData) {
     registration.teamMembers[memberIndex].submissionData = submissionData;
   }
 
   await registration.save();
 
-  res.status(200).json({ message: `Invitation ${status}`, registration });
+  res.status(200).json(
+    new ApiResponse(200, registration, 'Invitation status updated')
+  );
 });
+
 
 // ==========================================
 // 4. REMOVE MEMBER (Leader Only)
@@ -291,16 +311,23 @@ export const getMyInvites = asyncHandler(async (req, res) => {
 export const getRegistrationsByEvent = async (req, res) => {
   try {
     const eventId = req.params.eventId;
+    console.log("Fetching registrations for event ID:", eventId);
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20; // Higher default limit for lists
     const skip = (page - 1) * limit;
 
     const registrations = await Registration.find({ event: eventId })
-      .populate("user", "name email jnanagniId contactNo")
+      // .populate("registeredBy",  "name email jnanagniId contactNo")
+      .populate({
+        path: "registeredBy",
+        select: "name email jnanagniId contactNo",
+        model: User,
+      })
       .populate("event", "title date")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
+    console.log("Registrations fetched:", registrations);
 
     const totalDocs = await Registration.countDocuments({ event: eventId });
 
@@ -315,6 +342,7 @@ export const getRegistrationsByEvent = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: "Error fetching registrations", error });
+    console.error("Error in getRegistrationsByEvent:", error);
   }
 };
 
@@ -328,6 +356,19 @@ export const updateRegistrationStatus = async (req, res) => {
       return res.status(404).json({ message: "Registration not found" });
     }
 
+    if (!["active", "cancelled"].includes(status)) {
+      return res.status(400).json({ message: "Invalid status value" });
+    }
+
+    // if cancelled, delete the registration
+    if (status === "cancelled") {
+      await Registration.findByIdAndDelete(registrationId);
+      return res
+        .status(200)
+        .json({ message: "Registration cancelled successfully" });
+    }
+
+    // Otherwise, update status
     registration.status = status;
     await registration.save();
 

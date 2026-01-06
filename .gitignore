@@ -72,4 +72,4 @@ Thumbs.db
 *.tgz
 nodeFiles.md
 createDocs.js
-/src/uploads/*
+/uploads/*

@@ -19,6 +19,10 @@ import {
 } from "../controllers/registration.controller.js";
 import { protect } from "../middlewares/auth.middleware.js";
 import { upload } from "../middlewares/upload.middleware.js";
+import {
+  submitVolunteerRequest,
+  getMyVolunteerRequests,
+} from "../controllers/volunteerRequest.controller.js";
 
 const eventRouter = Router();
 
@@ -58,5 +62,18 @@ eventRouter.get('/registrations/:id', protect, getRegistrationById);
 
 // Update submission data (e.g., adding a github link later)
 eventRouter.put('/registrations/:id/submission', protect, updateRegistrationSubmissionData);
+
+// 5. Volunteer Requests
+eventRouter.post(
+  "/:eventId/volunteer-requests",
+  protect,
+  submitVolunteerRequest
+);
+
+eventRouter.get(
+  "/my-volunteer-requests",
+  protect,
+  getMyVolunteerRequests
+);
 
 export { eventRouter };

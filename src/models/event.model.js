@@ -6,22 +6,31 @@ const eventSchema = new Schema(
     name: { type: String, required: true },
     description: { type: String, required: true },
     slug: { type: String, required: true, unique: true },
-    category: { type: Schema.Types.ObjectId, ref: "EventCategory", required: true },
+    category: {
+      type: Schema.Types.ObjectId,
+      ref: "EventCategory",
+      required: true,
+    },
 
     // --- Media & Resources ---
     poster: { type: String }, // Path to image file
-    images: [String],         // Additional gallery images
-    
+    images: [String], // Additional gallery images
+
     // Ruleset can be a file download OR a google doc link
     rulesetFile: { type: String }, // Path to PDF/Doc
-    rulesetUrl: { type: String },  // External Link
-    
+    rulesetUrl: { type: String }, // External Link
+
     // ... Participation Config (keep existing) ...
-    participationType: { type: String, enum: ["solo", "group"], default: "solo", required: true },
+    participationType: {
+      type: String,
+      enum: ["solo", "group"],
+      default: "solo",
+      required: true,
+    },
     maxRegistrations: { type: Number, default: 0 },
     minTeamSize: { type: Number, default: 1 },
     maxTeamSize: { type: Number, default: 1 },
-    
+
     // ... Forms & Access (keep existing) ...
     registrationFields: [
       {
@@ -32,16 +41,27 @@ const eventSchema = new Schema(
         options: [String],
       },
     ],
-    memberFields: [{
+    memberFields: [
+      {
         fieldLabel: String,
-        fieldType: { type: String, default: 'text' },
+        fieldType: { type: String, default: "text" },
         fieldName: String,
         required: { type: Boolean, default: false },
-    }],
+      },
+    ],
+    volunteerFields: [
+      {
+        fieldLabel: String,
+        fieldType: { type: String, default: "text" }, // text, number, url, select etc.
+        fieldName: String,
+        required: { type: Boolean, default: false },
+        options: [String],
+      },
+    ],
 
     coordinators: [{ type: Schema.Types.ObjectId, ref: "User" }],
     volunteers: [{ type: Schema.Types.ObjectId, ref: "User" }],
-    
+
     // ... Standard Details (keep existing) ...
     venue: String,
     date: Date,
