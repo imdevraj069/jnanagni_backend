@@ -38,6 +38,17 @@ const registrationSchema = new Schema(
       of: Schema.Types.Mixed,
     },
 
+    submissionDataByMember: {
+      type: Map,
+      of: new Schema(
+        {
+          data: { type: Map, of: Schema.Types.Mixed },
+          submittedAt: { type: Date, default: Date.now },
+        },
+        { _id: false }
+      ),
+    },
+
     // Overall Status (e.g. if Admin disqualifies the whole team)
     status: {
       type: String,
