@@ -180,6 +180,8 @@ export const respondToInvite = asyncHandler(async (req, res) => {
 
   if (!["accepted", "rejected"].includes(status))
     throw new ApiError(400, "Invalid status.");
+  if (!submissionData)
+    throw new ApiError(400, "Submission data is required.");
 
   const registration = await Registration.findById(registrationId).populate(
     "event"
@@ -211,9 +213,7 @@ export const respondToInvite = asyncHandler(async (req, res) => {
     await checkDuplicateRegistration(user._id, registration.event._id);
 
     // Save member specific form data
-    if (submissionData) {
-      registration.teamMembers[memberIndex].submissionData = submissionData;
-    }
+    registration.teamMembers[memberIndex].submissionData = submissionData;
   }
 
   await registration.save();
