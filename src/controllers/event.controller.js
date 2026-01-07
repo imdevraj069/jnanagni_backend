@@ -263,25 +263,53 @@ export const updateEvent = async (req, res) => {
     // 2. Prepare Updates Object
     const updates = { ...req.body };
 
-    // Handle Files (Only update if new file provided)
+    // 3. Handle File Paths (Only update if new file provided)
     if (req.files) {
         if (req.files.poster) updates.poster = req.files.poster[0].path;
         if (req.files.rulesetFile) updates.rulesetFile = req.files.rulesetFile[0].path;
     }
 
-    // Handle JSON Parsing for FormData updates
+    // 4. Handle JSON Parsing for FormData updates
+    // Parse Arrays from JSON strings
     if (updates.coordinatorIds) updates.coordinators = parseJSON(updates.coordinatorIds);
     if (updates.volunteerIds) updates.volunteers = parseJSON(updates.volunteerIds);
-    if (updates.customFields) updates.customFields = parseJSON(updates.customFields);
     if (updates.registrationFields) updates.registrationFields = parseJSON(updates.registrationFields);
     if (updates.memberFields) updates.memberFields = parseJSON(updates.memberFields);
+    if (updates.volunteerFields) updates.volunteerFields = parseJSON(updates.volunteerFields);
 
-    // 3. Perform Update
-    const updatedEvent = await Event.findByIdAndUpdate(eventId, updates, { new: true });
+    // Handle category field mapping
+    if (updates.categoryId) {
+      updates.category = updates.categoryId;
+      delete updates.categoryId;
+    }
 
-    // 4. Role Assignment Logic (Diffing)
+    // Ensure participationType consistency with team sizes
+    if (updates.participationType) {
+      if (updates.participationType === "solo") {
+        updates.minTeamSize = 1;
+        updates.maxTeamSize = 1;
+      } else if (updates.participationType === "group") {
+        // Only set defaults if not explicitly provided
+        if (!updates.minTeamSize) updates.minTeamSize = 2;
+        if (!updates.maxTeamSize) updates.maxTeamSize = 5;
+      }
+    }
+
+    // 5. Perform Update
+    const updatedEvent = await Event.findByIdAndUpdate(eventId, updates, { new: true })
+      .populate("category")
+      .populate("createdby", "name email")
+      .populate("coordinators", "name email")
+      .populate("volunteers", "name email");
+
+    if (!updatedEvent) {
+      return res.status(404).json({ message: "Event not found" });
+    }
+
+    // 6. Role Assignment Logic (Diffing)
     // Check for NEW Coordinators
     if (updates.coordinators && Array.isArray(updates.coordinators)) {
+      console.log("Checking coordinator updates...", updates.coordinators);
       const oldCoordIds = existingEvent.coordinators.map((id) => id.toString());
       const newCoordIds = updates.coordinators.map((id) => id.toString());
       

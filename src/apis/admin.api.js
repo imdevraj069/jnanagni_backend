@@ -23,7 +23,9 @@ import {
     updateEvent, 
     deleteEvent, 
     addCoordinatorToEvent,
-    addVolunteerToEvent
+    addVolunteerToEvent,
+    getAllEvents,
+    getEventById
 } from "../controllers/event.controller.js";
 
 import { 
@@ -46,6 +48,8 @@ adminRouter.use(protect);
 // ==========================================
 adminRouter.get('/stats/overview', authorize('admin', 'finance_team'), getDashboardStats);
 adminRouter.get('/stats/analytics', authorize('admin'), getAnalyticsData);
+adminRouter.get('/events', authorize('admin', 'category_lead', 'event_coordinator'), getAllEvents);
+adminRouter.get('/events/:id', authorize('admin', 'category_lead', 'event_coordinator'), getEventById);
 
 // ==========================================
 // EVENT CATEGORY MANAGEMENT

@@ -25,6 +25,7 @@ export const protect = asyncHandler(async (req, res, next) => {
 
         // Check if user still exists
         req.user = await User.findById(decoded.id).select('-password');
+        console.log('Authenticated user:', req.user);
         
         if (!req.user) {
              throw new ApiError(401, 'User no longer exists');
