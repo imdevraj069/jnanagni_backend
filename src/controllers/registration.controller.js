@@ -2,6 +2,7 @@ import { Registration } from "../models/registration.model.js";
 import { Event } from "../models/event.model.js";
 import User from "../models/user.model.js";
 import ApiError from "../utils/ApiError.js";
+import ApiResponse from "../utils/ApiResponse.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import {
   sendRegistrationConfirmation,
@@ -174,7 +175,8 @@ export const inviteMember = asyncHandler(async (req, res) => {
 // 3. RESPOND TO INVITE (Member)
 // ==========================================
 export const respondToInvite = asyncHandler(async (req, res) => {
-  const registrationId = req.params.id;
+  const registrationId = await req.params.registrationId;
+  console.log("respondToInvite called with registrationId:", registrationId);
   const { status, submissionData } = req.body; // submissionData for memberFields
   const user = req.user;
 
@@ -186,7 +188,7 @@ export const respondToInvite = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'Submission data is required');
   }
 
-  const registration = await RegistrationModel.findById(registrationId).populate('event');
+  const registration = await Registration.findById(registrationId).populate('event');
 
   if (!registration) {
     throw new ApiError(404, 'Registration not found');
