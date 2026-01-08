@@ -314,7 +314,10 @@ export const updateEvent = async (req, res) => {
       const newCoordIds = updates.coordinators.map((id) => id.toString());
       
       const addedCoordinators = newCoordIds.filter((id) => !oldCoordIds.includes(id));
+      console.log("Added coordinators:", addedCoordinators);
+      
       for (const userId of addedCoordinators) {
+        console.log(`Assigning event_coordinator role to ${userId}`);
         await assignRoleAndNotify(userId, "event_coordinator", updatedEvent.name, "Event");
       }
     }
@@ -325,7 +328,10 @@ export const updateEvent = async (req, res) => {
       const newVolIds = updates.volunteers.map((id) => id.toString());
 
       const addedVolunteers = newVolIds.filter((id) => !oldVolIds.includes(id));
+      console.log("Added volunteers:", addedVolunteers);
+      
       for (const userId of addedVolunteers) {
+        console.log(`Assigning volunteer role to ${userId}`);
         await assignRoleAndNotify(userId, "volunteer", updatedEvent.name, "Event");
       }
     }

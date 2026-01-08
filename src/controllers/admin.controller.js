@@ -3,6 +3,8 @@ import { Event } from "../models/event.model.js";
 import { Registration } from "../models/registration.model.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import ApiResponse from "../utils/ApiResponse.js";
+import ApiError from "../utils/ApiError.js";
+import { sendWelcomeEmail } from "../services/email.service.js";
 
 // --- DASHBOARD OVERVIEW STATS ---
 export const getDashboardStats = asyncHandler(async (req, res) => {
@@ -97,5 +99,46 @@ export const getAnalyticsData = asyncHandler(async (req, res) => {
             paymentStats,
             collegeStats
         }, "Analytics data fetched successfully")
+    );
+});
+
+// --- ADMIN VERIFY USER EMAIL (WITHOUT TOKEN) ---
+export const adminVerifyUserEmail = asyncHandler(async (req, res) => {
+    const { userId, email } = req.body;
+
+    // At least one of userId or email must be provided
+    if (!userId && !email) {
+        throw new ApiError(400, "Please provide either userId or email");
+    }
+
+    // Find user by either userId or email
+    const query = userId ? { _id: userId } : { email };
+    const userRecord = await User.findOne(query);
+
+    if (!userRecord) {
+        throw new ApiError(404, "User not found");
+    }
+
+    // Check if user is already verified
+    if (userRecord.isVerified) {
+        throw new ApiError(400, "User is already verified");
+    }
+
+    // Verify the user
+    userRecord.isVerified = true;
+    userRecord.verificationToken = undefined;
+    userRecord.verificationExpire = undefined;
+    await userRecord.save();
+
+    // Send Welcome Email
+    try {
+        await sendWelcomeEmail(userRecord.email, userRecord.name, userRecord.jnanagniId);
+    } catch (error) {
+        console.error("Welcome email failed:", error);
+        // Don't throw error if email fails - user is already verified in DB
+    }
+
+    res.status(200).json(
+        new ApiResponse(200, { user: userRecord }, "User email verified successfully by admin")
     );
 });

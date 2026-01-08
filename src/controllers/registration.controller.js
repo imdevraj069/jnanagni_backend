@@ -20,8 +20,9 @@ const checkDuplicateRegistration = async (userId, eventId) => {
       { teamMembers: { $elemMatch: { user: userId, status: "accepted" } } }, // Is Active Member?
     ],
   });
-  if (existing)
-    throw new ApiError(400, "User is already registered for this event.");
+  if (existing) {
+    throw new ApiError(400, "This user is already registered for this event. A user cannot be in multiple teams for the same event.");
+  }
 };
 
 // ==========================================
@@ -129,20 +130,20 @@ export const inviteMember = asyncHandler(async (req, res) => {
 
   // 4. Constraints on Invitee
   if (invitee._id.toString() === leader._id.toString())
-    throw new ApiError(400, "Cannot invite yourself.");
+    throw new ApiError(400, "You cannot invite yourself to a team.");
   if (invitee.paymentStatus !== "verified")
-    throw new ApiError(400, "Invitee has not verified their payment yet.");
+    throw new ApiError(400, "Cannot invite this user - their payment has not been verified yet.");
 
   // Check if already in this team
   const inTeam = registration.teamMembers.find(
     (m) => m.email === invitee.email
   );
   if (inTeam && inTeam.status === "accepted")
-    throw new ApiError(400, "User already in team.");
+    throw new ApiError(400, "This user is already a member of your team.");
   if (inTeam && inTeam.status === "pending")
-    throw new ApiError(400, "Invite already sent.");
+    throw new ApiError(400, "An invitation has already been sent to this user for your team.");
 
-  // Check if in ANOTHER team
+  // Check if in ANOTHER team for the same event
   await checkDuplicateRegistration(invitee._id, event._id);
 
   // 5. Add to Array (Pending)
@@ -176,9 +177,17 @@ export const inviteMember = asyncHandler(async (req, res) => {
 // ==========================================
 export const respondToInvite = asyncHandler(async (req, res) => {
   const registrationId = await req.params.registrationId;
-  console.log("respondToInvite called with registrationId:", registrationId);
-  const { status, submissionData } = req.body; // submissionData for memberFields
+  let { status, submissionData } = req.body; // submissionData for memberFields
   const user = req.user;
+
+  // Parse submission data if it's a string (from frontend JSON.stringify)
+  if (typeof submissionData === "string") {
+    try {
+      submissionData = JSON.parse(submissionData);
+    } catch (e) {
+      submissionData = {};
+    }
+  }
 
   if (!['accepted', 'rejected'].includes(status)) {
     throw new ApiError(400, 'Invalid status');
@@ -196,7 +205,7 @@ export const respondToInvite = asyncHandler(async (req, res) => {
 
   // Find the invite within the array
   const memberIndex = registration.teamMembers.findIndex(
-    (m) => m.user?.toString() === user.id.toString() || m.email === user.email
+    (m) => m.user?.toString() === user._id.toString() || m.email === user.email
   );
   
   // verify if the team limit is not exceeded on acceptance
@@ -223,12 +232,12 @@ export const respondToInvite = asyncHandler(async (req, res) => {
 
   // Double check duplicate registration before accepting
   if (status === 'accepted') {
-    await checkDuplicateRegistration(user.id, registration.event.id);
+    await checkDuplicateRegistration(user._id, registration.event._id);
   }
 
   // Update Status
   registration.teamMembers[memberIndex].status = status;
-  registration.teamMembers[memberIndex].user = user.id;
+  registration.teamMembers[memberIndex].user = user._id;
 
   // STORE MEMBER SUBMISSION DATA (for memberFields)
   if (status === 'accepted' && submissionData) {
@@ -313,7 +322,6 @@ export const getMyInvites = asyncHandler(async (req, res) => {
 export const getRegistrationsByEvent = async (req, res) => {
   try {
     const eventId = req.params.eventId;
-    console.log("Fetching registrations for event ID:", eventId);
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20; // Higher default limit for lists
     const skip = (page - 1) * limit;
@@ -329,7 +337,6 @@ export const getRegistrationsByEvent = async (req, res) => {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
-    console.log("Registrations fetched:", registrations);
 
     const totalDocs = await Registration.countDocuments({ event: eventId });
 
@@ -344,7 +351,6 @@ export const getRegistrationsByEvent = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: "Error fetching registrations", error });
-    console.error("Error in getRegistrationsByEvent:", error);
   }
 };
 

@@ -14,7 +14,6 @@ const addVolunteerToEventInternal = async (userId, eventId) => {
       await event.save();
     }
   } catch (err) {
-    console.error('Error adding volunteer to event:', err);
     // Don't throw - non-critical operation
   }
 };
@@ -24,7 +23,6 @@ export const submitVolunteerRequest = asyncHandler(async (req, res) => {
   let formData = req.body;
   const userId = req.user.id;
   const eventId = await req.params.eventId;
-  console.log('User ID:', userId, 'Event ID:', eventId);
 
   if (!eventId) {
     throw new ApiError(400, 'Event ID is required');

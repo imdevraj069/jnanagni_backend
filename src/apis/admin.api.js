@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { protect } from "../middlewares/auth.middleware.js";
 import { authorize } from "../middlewares/access.middleware.js";
-import { getDashboardStats, getAnalyticsData } from "../controllers/admin.controller.js";
+import { getDashboardStats, getAnalyticsData, adminVerifyUserEmail } from "../controllers/admin.controller.js";
 import {upload} from "../middlewares/upload.middleware.js";
 
 // --- NEW IMPORT ---
@@ -48,6 +48,12 @@ adminRouter.use(protect);
 // ==========================================
 adminRouter.get('/stats/overview', authorize('admin', 'finance_team'), getDashboardStats);
 adminRouter.get('/stats/analytics', authorize('admin'), getAnalyticsData);
+
+// ==========================================
+// USER MANAGEMENT
+// ==========================================
+adminRouter.post('/users/verify-email', authorize('admin'), adminVerifyUserEmail);
+
 adminRouter.get('/events', authorize('admin', 'category_lead', 'event_coordinator'), getAllEvents);
 adminRouter.get('/events/:id', authorize('admin', 'category_lead', 'event_coordinator'), getEventById);
 

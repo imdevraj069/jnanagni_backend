@@ -14,13 +14,6 @@ import {
 
 const volunteerRequestRouter = Router();
 
-// cionsole each request to this router
-volunteerRequestRouter.use((req, res, next) => {
-  console.log(`[VolunteerRequest API] ${req.method} ${req.originalUrl}`);
-  console.log('Body:', req.body);
-  next();
-});
-
 // Student submits volunteer request
 // POST /api/v1/volunteer-requests/submit/:eventId
 volunteerRequestRouter.post(
