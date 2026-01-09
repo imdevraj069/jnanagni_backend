@@ -71,7 +71,7 @@ export const getAllUsers = asyncHandler(async (req, res) => {
 
 export const changeUserRole = asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const { role, specialRole } = req.body;
+    const { role, specialRoles } = req.body;
     
     const validRoles = ['student', 'gkvian', 'fetian', 'faculty'];
     const validSpecialRoles = ['event_coordinator', 'volunteer', 'category_lead', 'admin', 'finance_team', 'None'];
