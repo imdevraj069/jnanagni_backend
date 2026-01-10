@@ -16,7 +16,6 @@ export const connectDB = async () => {
         // If MONGODB_URI exists, use it. Otherwise, build it dynamically.
         // We use ?authSource=admin because the root user in Docker is created in the admin db.
         let uri = MONGODB_URI;
-        console.log('MONGODB_URI:', uri);
         
         if (!uri) {
             const credentials = DB_USER && DB_PASS 

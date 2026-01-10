@@ -22,7 +22,7 @@ export const sendVerificationEmail = async (email, name, jnanagniId, token) => {
     await transporter.sendMail({
       from: `"Jnanagni Security" <${process.env.EMAIL_USER}>`,
       to: email,
-      subject: `Action Required: Verify Your Jnanagni Account ID: ${jnanagniId}`,
+      subject: `Action Required: Verify Your Email: ${jnanagniId}`,
       html: html
     });
   };
