@@ -47,6 +47,15 @@ app.use(helmet());
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------
 app.use(morgan("dev"));
 
+app.use((req, res, next) => {
+    const contentLength = req.get('Content-Length');
+    if (contentLength) {
+        const sizeInMB = (contentLength / (1024 * 1024)).toFixed(2);
+        console.log(`[Request Size] ${sizeInMB} MB (${contentLength} bytes)`);
+    }
+    next();
+});
+
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------
 // | Body Parser Middleware
 // |
