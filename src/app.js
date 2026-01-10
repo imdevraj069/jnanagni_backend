@@ -65,7 +65,7 @@ app.use((req, res, next) => {
 // |
 // | Configure Express to parse incoming request bodies.
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------
-const limit = process.env.LIMIT || "10mb";
+const limit = process.env.LIMIT || "50mb";
 
 // Parses incoming JSON payloads.
 app.use(
