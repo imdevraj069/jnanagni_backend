@@ -17,7 +17,7 @@ jobs:
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
           echo "Deploying application..."
-          cd ~/projcet/backend || exit 1
+          cd ~/project/backend || exit 1
           git reset --hard origin/main
           git pull origin main
           npm install
