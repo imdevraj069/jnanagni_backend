@@ -47,13 +47,16 @@ app.use(helmet());
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------
 app.use(morgan("dev"));
 
+// --- ADD THIS LOGGER HERE ---
 app.use((req, res, next) => {
-    const contentLength = req.get('Content-Length');
-    if (contentLength) {
-        const sizeInMB = (contentLength / (1024 * 1024)).toFixed(2);
-        console.log(`[Request Size] ${sizeInMB} MB (${contentLength} bytes)`);
-    }
-    next();
+  const totalSize = req.get('Content-Length');
+  if (totalSize) {
+    const sizeInMB = (totalSize / (1024 * 1024)).toFixed(2);
+    console.log(`[Incoming Request] Total Size: ${sizeInMB} MB (${totalSize} bytes)`);
+  } else {
+    console.log('[Incoming Request] Size: Unknown (No Content-Length header)');
+  }
+  next();
 });
 
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------
