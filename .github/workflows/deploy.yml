@@ -16,7 +16,9 @@ jobs:
         username: ${{ secrets.SERVER_USERNAME }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
-          cd ~/projcet/backend
+          echo "Deploying application..."
+          cd ~/projcet/backend || exit 1
+          git reset --hard origin/main
           git pull origin main
           npm install
           pm2 restart mybackend
