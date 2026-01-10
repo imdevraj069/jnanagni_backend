@@ -97,6 +97,17 @@ const corsOptions = {
   
 };
 app.use(cors(corsOptions));
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.header("Access-Control-Allow-Methods", "GET,HEAD,PUT,PATCH,POST,DELETE");
+  res.header(
+    "Access-Control-Allow-Headers",
+    "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+  );
+  res.header("cross-origin-resource-policy", "same-site");
+  next();
+}
 
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------
 // | Static Asset Serving
@@ -108,7 +119,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Serve files from the 'uploads' directory under the '/uploads' URL path
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/uploads", express.static(path.join(__dirname, ".." , "uploads")));
 
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------
 // | Health Check Route
