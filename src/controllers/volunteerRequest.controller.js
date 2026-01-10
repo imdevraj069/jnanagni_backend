@@ -4,6 +4,7 @@ import User from '../models/user.model.js';
 import ApiError from '../utils/ApiError.js';
 import ApiResponse from '../utils/ApiResponse.js';
 import asyncHandler from '../utils/asyncHandler.js';
+import { sendRoleAssignmentEmail } from '../services/email.service.js';
 
 // Helper: Auto-add volunteer to event volunteers list
 const addVolunteerToEventInternal = async (userId, eventId) => {
@@ -15,6 +16,26 @@ const addVolunteerToEventInternal = async (userId, eventId) => {
     }
   } catch (err) {
     // Don't throw - non-critical operation
+  }
+};
+
+// Helper: Assign volunteer role and notify via email
+const assignRoleAndNotify = async (userId, role, contextName, contextType) => {
+  if (!userId) return;
+
+  const user = await User.findById(userId);
+  if (!user) return;
+
+  if (!user.specialRoles.includes(role)) {
+    user.specialRoles.push(role);
+    user.specialRoles = user.specialRoles.filter((r) => r !== "None");
+    await user.save();
+  }
+
+  try {
+    await sendRoleAssignmentEmail(user, role, contextName, contextType);
+  } catch (error) {
+    console.error(`Failed to send email to ${user.email}:`, error);
   }
 };
 
@@ -128,9 +149,10 @@ export const updateVolunteerRequestStatus = asyncHandler(async (req, res) => {
   }
   await request.save();
 
-  // Auto-add volunteer to event on approval
+  // Auto-add volunteer to event on approval and notify
   if (status === 'approved') {
     await addVolunteerToEventInternal(request.user._id, request.event._id);
+    await assignRoleAndNotify(request.user._id, 'volunteer', request.event.name, 'Event');
   }
 
   return res.status(200).json(
