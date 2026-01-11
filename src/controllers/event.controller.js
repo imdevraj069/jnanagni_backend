@@ -351,15 +351,20 @@ export const getAllEvents = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    const events = await Event.find()
+    // FIX 1: Build a filter object based on query params
+    const filter = {};
+    if (req.query.category) {
+      filter.category = req.query.category;
+    }
+
+    const events = await Event.find(filter) // Apply filter
       .populate("category")
       .populate("createdby", "name email")
-      // FIX: Add _id to sort to ensure stable order for pagination
       .sort({ date: 1, _id: 1 }) 
       .skip(skip)
       .limit(limit);
 
-    const totalDocs = await Event.countDocuments();
+    const totalDocs = await Event.countDocuments(filter); // Count filtered docs
 
     res.status(200).json({
       data: events,
@@ -372,6 +377,25 @@ export const getAllEvents = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: "Error fetching events", error });
+  }
+};
+
+// FIX 2: New Controller for Fetching by Slug
+export const getEventBySlug = async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const event = await Event.findOne({ slug })
+      .populate("category")
+      .populate("createdby", "name email")
+      .populate("coordinators", "name email")
+      .populate("volunteers", "name email");
+      
+    if (!event) {
+      return res.status(404).json({ message: "Event not found" });
+    }
+    res.status(200).json(event);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching event", error });
   }
 };
 

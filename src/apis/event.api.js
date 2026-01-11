@@ -3,6 +3,7 @@ import {
     getAllEventCategories, 
     getEventCategoryById,
     getAllEvents,
+    getEventBySlug,
     getEventById,
     getEventsByCategory
 } from "../controllers/event.controller.js";
@@ -37,6 +38,7 @@ eventRouter.get('/categories/:id', getEventCategoryById);
 // --- Events ---
 eventRouter.get('/', getAllEvents);
 eventRouter.get('/find/:id', getEventById);
+eventRouter.get('/slug/:slug', getEventBySlug)
 eventRouter.get('/category/:categoryId', getEventsByCategory);
 
 
