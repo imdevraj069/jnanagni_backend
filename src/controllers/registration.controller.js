@@ -67,13 +67,13 @@ export const registerForEvent = asyncHandler(async (req, res) => {
 
   // 6. Create Registration
   if (event.participationType === "group") {
-    if (!teamName) throw new ApiError(400, "Team Name is required.");
+    // if (!teamName) throw new ApiError(400, "Team Name is required.");
 
     // Create Team Shell
     const newReg = await Registration.create({
       registeredBy: user._id,
       event: eventId,
-      teamName,
+      teamName: submissionData.teamName || teamName || `Team_${user.jnanagniId}`,
       submissionData,
       teamMembers: [], // Starts empty
     });
