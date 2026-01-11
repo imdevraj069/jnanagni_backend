@@ -18,7 +18,7 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
         User.countDocuments({}),
         Event.countDocuments({}),
         Registration.countDocuments({}),
-        User.countDocuments({ paymentStatus: { $in: ['pending', 'none'] }, role: 'student' }) // Adjust filter as needed
+        User.countDocuments({ paymentStatus: { $in: ['pending', 'none'] } }) // Adjust filter as needed
     ]);
 
     res.status(200).json(
