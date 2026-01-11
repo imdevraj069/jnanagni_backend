@@ -354,7 +354,8 @@ export const getAllEvents = async (req, res) => {
     const events = await Event.find()
       .populate("category")
       .populate("createdby", "name email")
-      .sort({ date: 1 })
+      // FIX: Add _id to sort to ensure stable order for pagination
+      .sort({ date: 1, _id: 1 }) 
       .skip(skip)
       .limit(limit);
 
@@ -401,6 +402,8 @@ export const getEventsByCategory = async (req, res) => {
     const events = await Event.find({ category: categoryId })
       .populate("category")
       .populate("createdby", "name email")
+      // FIX: Added explicit sort here too. Without this, pagination is random.
+      .sort({ date: 1, _id: 1 }) 
       .skip(skip)
       .limit(limit);
 
