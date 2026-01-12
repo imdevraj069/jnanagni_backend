@@ -452,3 +452,19 @@ export const updateRegistrationSubmissionData = async (req, res) => {
     res.status(500).json({ message: "Error updating submission data", error });
   }
 };
+
+
+// get all registrations (admin)
+export const getAllRegistrations = async (req, res) => {
+  try {
+
+    const registrations = await Registration.find()
+      .populate("registeredBy", "name email jnanagniId contactNo")
+      .populate("event", "title date")
+      .sort({ createdAt: -1 })
+
+    res.status(200).json({message: "All registrations fetched successfully", registrations});
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching registrations", error });
+  }
+}

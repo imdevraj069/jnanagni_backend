@@ -31,7 +31,8 @@ import {
 import { 
     getRegistrationsByEvent, 
     updateRegistrationStatus,
-    deleteRegistration
+    deleteRegistration,
+    getAllRegistrations
 } from "../controllers/registration.controller.js";
 import {
   getVolunteerRequestsByEvent,
@@ -253,6 +254,11 @@ adminRouter.put(
   "/volunteer-requests/:id/status",
   authorize("admin", "categorylead", "eventcoordinator"),
   updateVolunteerRequestStatus
+);
+
+adminRouter.get('/registrations',
+    authorize('admin', 'finance_team'),
+    getAllRegistrations
 );
 
 export { adminRouter };
