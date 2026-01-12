@@ -20,9 +20,10 @@ import { authRouter } from "./apis/auth.api.js";
 import { userRouter } from "./apis/user.api.js";
 import { eventRouter } from "./apis/event.api.js"; // Import Event Router
 import { adminRouter } from "./apis/admin.api.js"; // Import Admin Router
-import { seedRouter } from "./apis/seed.api.js";
+// import { seedRouter } from "./apis/seed.api.js";
 import volunteerRequestRouter from './apis/volunteerRequest.api.js';
 import testRouter from "./apis/test.api.js";
+import querryRouter from "./apis/querry.api.js";
 
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------
 // | Express Application Initialization
@@ -162,7 +163,8 @@ app.use("/api/v1/admin", adminRouter);   // Protected Management routes
 app.use('/api/v1/volunteer-requests', volunteerRequestRouter);
 // app.use("/api/v1/seed", seedRouter);
 // Place this BEFORE the other API routes
-app.use("/api/test", testRouter);
+// app.use("/api/test", testRouter);
+app.use("/api/v1/queries", querryRouter);
 
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------
 // | Global Error Handler
