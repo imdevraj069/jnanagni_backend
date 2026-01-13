@@ -5,6 +5,7 @@ import { getOtpTemplate } from '../templates/otpEmail.js';
 // We will use one flexible template for all role assignments
 import { getRoleAssignmentTemplate } from '../templates/roleAssignmentEmail.js';
 import { getTeamInviteTemplate } from '../templates/teamInviteEmail.js';
+import { getPaymentVerificationTemplate } from '../templates/paymentVerificationEmail.js';
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -96,5 +97,17 @@ export const sendRegistrationConfirmation = async (user, eventName, teamName = n
       <p>${message}</p>
       <p>Visit your dashboard to view details.</p>
     `
+  });
+};
+
+// --- NEW: Payment Verification Email ---
+export const sendPaymentVerificationEmail = async (email, name, jnanagniId) => {
+  const html = getPaymentVerificationTemplate(name, jnanagniId);
+
+  await transporter.sendMail({
+    from: `"Jnanagni Finance" <${process.env.EMAIL_USER}>`,
+    to: email,
+    subject: `Payment Verified - Ready to Onboard! [ID: ${jnanagniId}]`,
+    html: html
   });
 };

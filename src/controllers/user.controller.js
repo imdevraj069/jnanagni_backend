@@ -2,6 +2,7 @@ import user from "../models/user.model.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
+import { sendPaymentVerificationEmail } from "../services/email.service.js";
 
 // --- GET USER BY JNANAGNI ID (For Scanner) ---
 export const getUserByJnanagniId = asyncHandler(async (req, res) => {
@@ -206,6 +207,14 @@ export const verifyUserPayment = asyncHandler(async (req, res) => {
 
     foundUser.paymentStatus = "verified";
     await foundUser.save();
+
+    // Send payment verification email
+    try {
+        await sendPaymentVerificationEmail(foundUser.email, foundUser.name, foundUser.jnanagniId);
+    } catch (error) {
+        console.error("Payment verification email failed:", error);
+        // Don't throw error if email fails - payment is already verified in DB
+    }
 
     res.status(200).json(
         new ApiResponse(200, foundUser, "User payment verified successfully")
