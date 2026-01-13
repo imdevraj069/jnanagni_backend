@@ -407,7 +407,7 @@ export const getRegistrationsByUser = async (req, res) => {
       status: "active"
     })
       .populate("registeredBy", "name email")
-      .populate("event", "title date venue maxTeamSize")
+      .populate("event")
       .populate("teamMembers.user", "name email jnanagniId");
     
     res.status(200).json(registrations);
