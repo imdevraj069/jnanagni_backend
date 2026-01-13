@@ -127,7 +127,12 @@ export const resendVerification = asyncHandler(async (req, res) => {
   if (!userRecord) throw new ApiError(404, "User not found");
   if (userRecord.isVerified) throw new ApiError(400, "User already verified");
 
-  const newToken = userRecord.generateVerificationToken();
+  const newToken = 
+  // check if existing token is not expired send that token and reset time of expiry for 10 mins
+  (userRecord.verificationExpire && userRecord.verificationExpire > Date.now()) 
+    ? userRecord.verificationToken 
+    : userRecord.generateVerificationToken();
+  userRecord.verificationExpire = Date.now() + 30 * 60 * 1000; // 30 mins from now
   await userRecord.save({ validateBeforeSave: false });
 
   try {
