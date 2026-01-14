@@ -42,7 +42,8 @@ const assignRoleAndNotify = async (userId, role, contextName, contextType) => {
 // 1. Student submits volunteer request
 export const submitVolunteerRequest = asyncHandler(async (req, res) => {
   let formData = req.body;
-  const userId = req.user.id;
+  console.log("Volunteer Request Form Data:", formData);
+  const userId = req.user._id;
   const eventId = await req.params.eventId;
 
   if (!eventId) {
