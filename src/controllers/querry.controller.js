@@ -2,12 +2,12 @@ import querrymodel from '../models/query.model.js';
 
 export const createQuery = async (req, res) => {
     try {
-        const { name, email, mobile, subject, message } = req.body;
+        const { name, email, phone, subject, message } = req.body;
 
         const newQuery = new querrymodel({
             name,
             email,
-            mobile,
+            mobile: phone,
             subject,
             message,
         });
