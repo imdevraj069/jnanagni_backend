@@ -10,6 +10,7 @@ import helmet from "helmet"; // Security middleware for setting HTTP headers
 import path from "path"; // Node.js utility for handling file paths
 import { fileURLToPath } from "url"; // Utility to resolve ES module file paths
 import errm from "./middlewares/error.middleware.js"; // Custom global error handler
+import rateLimit from "express-rate-limit";
 
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------
 // | API Route Imports
@@ -67,6 +68,16 @@ app.use((req, res, next) => {
 // | Configure Express to parse incoming request bodies.
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------
 const limit = process.env.LIMIT || "50mb";
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  standardHeaders: true, 
+  legacyHeaders: false,
+  message: 'Too many requests, please try again later.',
+});
+
+app.use(limiter);
 
 // Parses incoming JSON payloads.
 app.use(
