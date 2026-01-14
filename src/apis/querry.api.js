@@ -20,9 +20,9 @@ querryRouter.use(protect);
 querryRouter.use(authorize('admin'));
 
 querryRouter.get('/', getAllQueries);
-querryRouter.get('/:id', getQueryById);
-querryRouter.delete('/:id', deleteQueryById);
-querryRouter.patch('/:id/resolve', markQueryAsResolved);
+querryRouter.get('/q/:id', getQueryById);
+querryRouter.delete('/q/:id', deleteQueryById);
+querryRouter.patch('/q/:id/resolve', markQueryAsResolved);
 
 export default querryRouter;
 
