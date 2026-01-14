@@ -69,15 +69,15 @@ app.use((req, res, next) => {
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------
 const limit = process.env.LIMIT || "50mb";
 
-const limiter = rateLimit({
-  windowMs: 5 * 60 * 1000, // 15 minutes
-  max: 30, // Limit each IP to 100 requests per windowMs
-  standardHeaders: true, 
-  legacyHeaders: false,
-  message: 'Too many requests, please try again later.',
-});
+// const limiter = rateLimit({
+//   windowMs: 5 * 60 * 1000, // 15 minutes
+//   max: 30, // Limit each IP to 100 requests per windowMs
+//   standardHeaders: true, 
+//   legacyHeaders: false,
+//   message: 'Too many requests, please try again later.',
+// });
 
-app.use(limiter);
+// app.use(limiter);
 
 // Parses incoming JSON payloads.
 app.use(
