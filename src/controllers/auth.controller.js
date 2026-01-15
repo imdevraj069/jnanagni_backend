@@ -57,6 +57,7 @@ export const register = asyncHandler(async (req, res) => {
 
   // Generate Verification Token
   const verificationToken = newUser.generateVerificationToken();
+  newUser.verificationExpire = Date.now() + 10 * 60 * 1000; // 10 mins
   await newUser.save();
 
   // Send Verification Email
