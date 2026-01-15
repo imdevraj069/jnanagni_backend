@@ -204,6 +204,16 @@ export const verifyUserPayment = asyncHandler(async (req, res) => {
     if (!foundUser) {
         throw new ApiError(404, "User not found");
     }
+    // check if payment is already verified
+    if (foundUser.paymentStatus === "verified") {
+        throw new ApiError(400, "User payment is already verified");
+    }
+    // check if email is not verified
+    if (!foundUser.isVerified) {
+        throw new ApiError(400, "User email is not verified. Cannot verify payment.");
+    }
+
+    // Update payment status to verified
 
     foundUser.paymentStatus = "verified";
     await foundUser.save();
