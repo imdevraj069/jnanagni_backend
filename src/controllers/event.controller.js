@@ -315,7 +315,6 @@ export const updateEvent = async (req, res) => {
       const addedCoordinators = newCoordIds.filter((id) => !oldCoordIds.includes(id));
       
       for (const userId of addedCoordinators) {
-        console.log(`Assigning event_coordinator role to ${userId}`);
         await assignRoleAndNotify(userId, "event_coordinator", updatedEvent.name, "Event");
       }
     }
