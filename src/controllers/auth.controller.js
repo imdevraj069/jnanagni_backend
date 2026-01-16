@@ -84,11 +84,11 @@ export const verifyUserEmail = asyncHandler(async (req, res) => {
   }
 
   // Hash token to compare with DB
-  // const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+  const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
 
   const userRecord = await user.findOne({
     jnanagniId,
-    verificationToken: token,
+    verificationToken: hashedToken,
     verificationExpire: { $gt: Date.now() } // Check expiry
   });
 
