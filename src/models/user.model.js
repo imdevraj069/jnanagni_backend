@@ -101,10 +101,11 @@ userSchema.methods.generateVerificationToken = function () {
   const token = crypto.randomBytes(64).toString("hex");
 
   // 2. Hash it before saving to DB
-  this.verificationToken = crypto
-    .createHash("sha256")
-    .update(token)
-    .digest("hex");
+  this.verificationToken = token;
+  // crypto
+  //   .createHash("sha256")
+  //   .update(token)
+  //   .digest("hex");
 
   // 3. Set expiry for 30 minutes
   this.verificationExpire = Date.now() + 30 * 60 * 1000;
