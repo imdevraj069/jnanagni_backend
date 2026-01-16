@@ -25,6 +25,7 @@ import { adminRouter } from "./apis/admin.api.js"; // Import Admin Router
 import volunteerRequestRouter from './apis/volunteerRequest.api.js';
 import testRouter from "./apis/test.api.js";
 import querryRouter from "./apis/querry.api.js";
+import resultRouter from "./apis/result.api.js";
 
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------
 // | Express Application Initialization
@@ -176,6 +177,7 @@ app.use('/api/v1/volunteer-requests', volunteerRequestRouter);
 // Place this BEFORE the other API routes
 // app.use("/api/test", testRouter);
 app.use("/api/v1/queries", querryRouter);
+app.use("/api/v1/results", resultRouter);
 
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------
 // | Global Error Handler
