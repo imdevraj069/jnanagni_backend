@@ -12,7 +12,7 @@ export const getUserByJnanagniId = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Jnanagni ID is required");
     }
 
-    const foundUser = await user.findOne({ jnanagniId }).select("-password -resetPasswordToken -__v");
+    const foundUser = await user.findOne({ jnanagniId }).select("-password -resetPasswordToken -verificationToken -verificationExpire -__v").lean();
 
     if (!foundUser) {
         throw new ApiError(404, "User not found with this ID");
@@ -49,10 +49,11 @@ export const getAllUsers = asyncHandler(async (req, res) => {
 
     // Fetch paginated users
     const users = await user.find()
-        .select("-password -resetPasswordToken -__v")
+        .select("-password -resetPasswordToken -verificationToken -verificationExpire -__v")
         .sort({ createdAt: -1 }) // Newest first
         .skip(skip)
-        .limit(limit);
+        .limit(limit)
+        .lean();
 
     // Get total count for frontend calculations
     const totalDocs = await user.countDocuments();
@@ -132,7 +133,7 @@ export const deleteUser = asyncHandler(async (req, res) => {
 export const getUserById = asyncHandler(async (req, res) => {
     const { id } = req.params;
 
-    const foundUser = await user.findById(id).select("-password -resetPasswordToken -__v");
+    const foundUser = await user.findById(id).select("-password -resetPasswordToken -verificationToken -verificationExpire -__v").lean();
 
     if (!foundUser) {
         throw new ApiError(404, "User not found");
@@ -151,7 +152,7 @@ export const getUsersByRole = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Invalid role specified");
     }
 
-    const users = await user.find({ role }).select("-password -resetPasswordToken -__v");
+    const users = await user.find({ role }).select("-password -resetPasswordToken -verificationToken -verificationExpire -__v").lean();
 
     res.status(200).json(
         new ApiResponse(200, users, `Users with role ${role} fetched successfully`)
@@ -166,7 +167,7 @@ export const getUsersBySpecialRole = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Invalid special role specified");
     }
 
-    const users = await user.find({ specialRoles: specialRole }).select("-password -resetPasswordToken -__v");
+    const users = await user.find({ specialRoles: specialRole }).select("-password -resetPasswordToken -verificationToken -verificationExpire -__v").lean();
 
     res.status(200).json(
         new ApiResponse(200, users, `Users with special role ${specialRole} fetched successfully`)
@@ -174,7 +175,7 @@ export const getUsersBySpecialRole = asyncHandler(async (req, res) => {
 });
 
 export const getUnverifiedUsers = asyncHandler(async (req, res) => {
-    const users = await user.find({ isVerified: false }).select("-password -resetPasswordToken -__v");
+    const users = await user.find({ isVerified: false }).select("-password -resetPasswordToken -verificationToken -verificationExpire -__v").lean();
 
     res.status(200).json(
         new ApiResponse(200, users, "Unverified users fetched successfully")
@@ -184,7 +185,8 @@ export const getUnverifiedUsers = asyncHandler(async (req, res) => {
 export const getUserUnverifiedPayments = asyncHandler(async (req, res) => {
   const users = await user
     .find({ paymentStatus: { $ne: "verified" } })
-    .select("-password -resetPasswordToken -__v");
+    .select("-password -resetPasswordToken -verificationToken -verificationExpire -__v")
+    .lean();
 
   res.status(200).json(
     new ApiResponse(

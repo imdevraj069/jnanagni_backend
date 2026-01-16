@@ -104,7 +104,8 @@ export const getVolunteerRequestsByEvent = asyncHandler(async (req, res) => {
     .populate('event', 'name date')
     .sort({ createdAt: -1 })
     .skip(skip)
-    .limit(limit);
+    .limit(limit)
+    .lean();
 
   const totalDocs = await VolunteerRequest.countDocuments({ event: eventId });
 
@@ -166,7 +167,8 @@ export const getMyVolunteerRequests = asyncHandler(async (req, res) => {
 
   const requests = await VolunteerRequest.find({ user: userId })
     .populate('event', 'name date venue category')
-    .sort({ createdAt: -1 });
+    .sort({ createdAt: -1 })
+    .lean();
 
   return res.status(200).json(
     new ApiResponse(200, requests, 'Your volunteer requests fetched successfully')

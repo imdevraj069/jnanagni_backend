@@ -311,7 +311,8 @@ export const getMyInvites = asyncHandler(async (req, res) => {
       },
     })
       .populate("registeredBy", "name email")
-      .populate("event");
+      .populate("event")
+      .lean();
 
     res.status(200).json(invites);
   } catch (error) {
@@ -336,7 +337,8 @@ export const getRegistrationsByEvent = async (req, res) => {
       .populate("event")
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .lean();
 
     const totalDocs = await Registration.countDocuments({ event: eventId });
 
@@ -408,7 +410,8 @@ export const getRegistrationsByUser = async (req, res) => {
     })
       .populate("registeredBy", "name email")
       .populate("event")
-      .populate("teamMembers.user", "name email jnanagniId");
+      .populate("teamMembers.user", "name email jnanagniId")
+      .lean();
     
     res.status(200).json(registrations);
   } catch (error) {
@@ -423,7 +426,8 @@ export const getRegistrationById = async (req, res) => {
     const registrationId = req.params.id;
     const registration = await Registration.findById(registrationId)
       .populate("user", "name email")
-      .populate("event");
+      .populate("event")
+      .lean();
     if (!registration) {
       return res.status(404).json({ message: "Registration not found" });
     }
@@ -462,6 +466,7 @@ export const getAllRegistrations = async (req, res) => {
       .populate("registeredBy", "name email jnanagniId contactNo")
       .populate("event")
       .sort({ createdAt: -1 })
+      .lean();
 
     res.status(200).json({message: "All registrations fetched successfully", registrations});
   } catch (error) {

@@ -357,7 +357,8 @@ export const getAllEvents = async (req, res) => {
       .populate("createdby", "name email")
       .sort({ date: 1, _id: 1 }) 
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .lean();
 
     const totalDocs = await Event.countDocuments(filter); // Count filtered docs
 
@@ -383,7 +384,8 @@ export const getEventBySlug = async (req, res) => {
       .populate("category")
       .populate("createdby", "name email")
       .populate("coordinators", "name email")
-      .populate("volunteers", "name email");
+      .populate("volunteers", "name email")
+      .lean();
       
     if (!event) {
       return res.status(404).json({ message: "Event not found" });
@@ -401,7 +403,8 @@ export const getEventById = async (req, res) => {
       .populate("category")
       .populate("createdby", "name email")
       .populate("coordinators", "name email")
-      .populate("volunteers", "name email");
+      .populate("volunteers", "name email")
+      .lean();
     if (!event) {
       return res.status(404).json({ message: "Event not found" });
     }
@@ -424,7 +427,8 @@ export const getEventsByCategory = async (req, res) => {
       // FIX: Added explicit sort here too. Without this, pagination is random.
       .sort({ date: 1, _id: 1 }) 
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .lean();
 
     const totalDocs = await Event.countDocuments({ category: categoryId });
 
