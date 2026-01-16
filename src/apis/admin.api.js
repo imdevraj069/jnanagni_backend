@@ -193,6 +193,21 @@ adminRouter.get(
     async (req, res) => {
         try {
             const Event = (await import("../models/event.model.js")).Event;
+            
+            // 1. CHECK FOR ADMIN (The Fix)
+            // If user has 'admin' in specialRoles OR is a main admin
+            if (req.user.specialRoles.includes('admin') || req.user.role === 'admin') {
+                 const allEvents = await Event.find()
+                    .populate("category", "name")
+                    .populate("coordinators", "name email jnanagniId")
+                    .populate("volunteers", "name email jnanagniId")
+                    .sort({ createdAt: -1 });
+                 
+                 return res.status(200).json(allEvents);
+            }
+
+            // 2. EXISTING LOGIC (For Leads & Coordinators)
+            // Finds events where user is coord OR user is lead of the category
             const events = await Event
                 .find({
                     $or: [
@@ -203,6 +218,7 @@ adminRouter.get(
                 .populate("category", "name")
                 .populate("coordinators", "name email jnanagniId")
                 .populate("volunteers", "name email jnanagniId");
+                
             res.status(200).json(events);
         } catch (error) {
             res.status(500).json({ message: "Error fetching events", error });
