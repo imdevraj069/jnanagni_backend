@@ -73,3 +73,23 @@ export const removePassFromUser = asyncHandler(async (req, res) => {
     await user.save();
     res.status(200).json(new ApiResponse(200, user, "Pass removed successfully"));
 });
+
+// --- ADMIN: Delete Pass (removes from all users) ---
+export const deletePass = asyncHandler(async (req, res) => {
+    const { passId } = req.body;
+
+    // Verify the pass exists before deleting
+    const pass = await Pass.findById(passId);
+    if (!pass) throw new ApiError(404, "Pass not found");
+
+    // Remove the pass from all users who have it
+    await User.updateMany(
+        { purchasedPasses: passId },
+        { $pull: { purchasedPasses: passId } }
+    );
+
+    // Delete the pass itself
+    await Pass.findByIdAndDelete(passId);
+
+    res.status(200).json(new ApiResponse(200, null, "Pass deleted successfully and removed from all users"));
+});

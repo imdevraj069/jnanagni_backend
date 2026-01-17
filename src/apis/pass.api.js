@@ -4,6 +4,7 @@ import {
   getAllPasses,
   assignPassToUser,
   removePassFromUser,
+  deletePass,
 } from "../controllers/pass.controller.js";
 import { protect } from "../middlewares/auth.middleware.js";
 import { authorize } from "../middlewares/access.middleware.js";
@@ -33,6 +34,14 @@ passRouter.post(
     protect,
     authorize("admin"),
     removePassFromUser
+);
+
+// Admin: Delete pass (removes from all users)
+passRouter.delete(
+    "/delete",
+    protect,
+    authorize("admin", "finance_team"),
+    deletePass
 );
 
 export default passRouter;
