@@ -173,7 +173,8 @@ export const createEvent = async (req, res) => {
       // customFields,   // Expecting JSON string for array
       registrationFields,
       memberFields,
-      volunteerFields
+      volunteerFields,
+      requiredPassType
     } = req.body;
 
     // 3. Generate Slug
@@ -202,6 +203,7 @@ export const createEvent = async (req, res) => {
       time,
       venue,
       category: categoryId,
+      requiredPassType: requiredPassType || "none",
       
       // File & URL Fields
       poster: posterPath,
@@ -217,13 +219,6 @@ export const createEvent = async (req, res) => {
       // Form Config
       registrationFields: parsedRegistrationFields,
       memberFields: parsedMemberFields,
-      // customFields: parsedCustomFields.map((f) => ({
-      //     fieldLabel: f.fieldLabel,
-      //     fieldType: f.fieldType,
-      //     fieldName: f.fieldName,
-      //     required: f.required || false,
-      //     options: f.options || [],
-      // })),
       volunteerFields: parsedVolunteerFields,
 
       isRegistrationOpen: true,

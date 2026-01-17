@@ -26,7 +26,7 @@ router.get("/status/:userId", protect, getUserPassStatus);
 router.get("/user/:userId", protect, getUserPassOrders);
 
 // Get pass order details
-router.get("/:orderId", protect, getPassOrderDetails);
+router.get("/orders/:orderId", protect, getPassOrderDetails);
 
 // --- Admin Routes ---
 
