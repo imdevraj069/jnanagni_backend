@@ -11,6 +11,11 @@ const eventSchema = new Schema(
       ref: "EventCategory",
       required: true,
     },
+    requiredPassType: {
+      type: String,
+      enum: ["none", "egames", "workshop", "edm", "supersaver"], // 'none' for general free events
+      default: "none"
+    },
 
     // --- Media & Resources ---
     poster: { type: String }, // Path to image file

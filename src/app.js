@@ -26,6 +26,8 @@ import volunteerRequestRouter from './apis/volunteerRequest.api.js';
 import testRouter from "./apis/test.api.js";
 import querryRouter from "./apis/querry.api.js";
 import resultRouter from "./apis/result.api.js";
+import passRouter from "./apis/pass.api.js"; // Add this
+import passOrderRouter from "./apis/passOrder.api.js";
 
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------
 // | Express Application Initialization
@@ -178,6 +180,8 @@ app.use('/api/v1/volunteer-requests', volunteerRequestRouter);
 // app.use("/api/test", testRouter);
 app.use("/api/v1/queries", querryRouter);
 app.use("/api/v1/results", resultRouter);
+app.use("/api/v1/passes", passRouter); // Add this line
+app.use("/api/v1/pass-orders", passOrderRouter);
 
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------
 // | Global Error Handler

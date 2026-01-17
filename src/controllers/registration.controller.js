@@ -1,5 +1,6 @@
 import { Registration } from "../models/registration.model.js";
 import { Event } from "../models/event.model.js";
+import { Pass } from "../models/pass.model.js";
 import User from "../models/user.model.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
@@ -31,7 +32,7 @@ const checkDuplicateRegistration = async (userId, eventId) => {
 export const registerForEvent = asyncHandler(async (req, res) => {
   const { eventId, teamName } = req.body;
   let { submissionData } = req.body; // Form data
-  const user = req.user;
+  const user = await User.findById(req.user._id).populate("purchasedPasses");
 
   // 1. Parse Data
   if (typeof submissionData === "string") {
@@ -47,6 +48,25 @@ export const registerForEvent = asyncHandler(async (req, res) => {
   if (!event) throw new ApiError(404, "Event not found");
   if (!event.isRegistrationOpen)
     throw new ApiError(400, "Registration is closed.");
+
+  const isOutsider = !['gkvian', 'fetian', 'faculty'].includes(user.role);
+
+  if (isOutsider && event.requiredPassType && event.requiredPassType !== 'none') {
+      
+      // FIX: Ensure array exists
+      if (!user.purchasedPasses || user.purchasedPasses.length === 0) {
+          throw new ApiError(403, `This event requires a ${event.requiredPassType} pass.`);
+      }
+
+      const hasAccess = user.purchasedPasses.some(pass => {
+          // FIX: Add optional chaining just in case a pass was deleted from DB but remains in user array
+          return pass?.type === 'supersaver' || pass?.type === event.requiredPassType;
+      });
+
+      if (!hasAccess) {
+           throw new ApiError(403, `Your current passes do not cover this event. Required: ${event.requiredPassType} or Supersaver.`);
+      }
+  }
 
   // 3. Payment Check (Mandatory)
   if (user.paymentStatus !== "verified") {

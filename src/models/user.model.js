@@ -1,7 +1,9 @@
 import mongoose, { Schema } from "mongoose";
+import { Pass } from "./pass.model.js"
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
+import { type } from "os";
 
 const userSchema = new Schema(
   {
@@ -33,6 +35,10 @@ const userSchema = new Schema(
       ],
       default: "student",
     },
+    purchasedPasses: [{
+        type: Schema.Types.ObjectId,
+        ref: "Pass"
+    }],
     specialRoles: [
       {
         type: String,
