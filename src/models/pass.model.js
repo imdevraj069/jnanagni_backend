@@ -17,6 +17,10 @@ const passSchema = new Schema(
       required: true 
     },
     description: String,
+    qrCode: { 
+      type: String, // Path to the uploaded QR image
+      required: true // Admin must upload a QR for payment
+    },
     isActive: { 
       type: Boolean, 
       default: true 

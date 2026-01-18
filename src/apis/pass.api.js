@@ -8,6 +8,7 @@ import {
 } from "../controllers/pass.controller.js";
 import { protect } from "../middlewares/auth.middleware.js";
 import { authorize } from "../middlewares/access.middleware.js";
+import { upload } from "../middlewares/upload.middleware.js"; // Import upload middleware
 
 const passRouter = Router();
 
@@ -19,6 +20,7 @@ passRouter.post(
   "/config",
   protect,
   authorize("admin", "finance_team"),
+  upload.single('qrCode'), // to upload qr code image
   createOrUpdatePass,
 );
 

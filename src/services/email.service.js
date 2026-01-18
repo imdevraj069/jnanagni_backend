@@ -5,6 +5,8 @@ import { getOtpTemplate } from '../templates/otpEmail.js';
 import { getRoleAssignmentTemplate } from '../templates/roleAssignmentEmail.js';
 import { getTeamInviteTemplate } from '../templates/teamInviteEmail.js';
 import { getPaymentVerificationTemplate } from '../templates/paymentVerificationEmail.js';
+import { getPassPurchaseTemplate } from '../templates/passPurchaseEmail.js';
+import { getPassRejectionTemplate } from '../templates/passRejectionEmail.js';
 
 // ==========================================
 // 1. CONFIGURE TRANSPORTERS
@@ -180,5 +182,25 @@ export const sendRegistrationConfirmation = async (user, eventName, teamName = n
       subject: subject,
       html: html,
       fromOverride: "Jnanagni Events"
+    });
+};
+
+export const sendPassPurchaseConfirmation = async (user, pass, transactionId) => {
+    // Uses 'noreply' channel usually, or 'info'
+    await sendDistributedMail('noreply', {
+      to: user.email,
+      subject: `Pass Activated: ${pass.name} 🎟️`,
+      html: getPassPurchaseTemplate(user.name, pass.name, transactionId),
+      fromOverride: "Jnanagni Finance"
+    });
+};
+
+export const sendPassRejectionEmail = async (user, pass, reason) => {
+    // Uses 'help' or 'noreply' - prioritize reliability
+    await sendDistributedMail('help', {
+      to: user.email,
+      subject: `Update on your ${pass.name} Request`,
+      html: getPassRejectionTemplate(user.name, pass.name, reason),
+      fromOverride: "Jnanagni Finance"
     });
 };

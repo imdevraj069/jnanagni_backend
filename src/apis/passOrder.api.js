@@ -1,36 +1,50 @@
 import express from "express";
 import {
-  purchasePass,
-  upgradeToSupersaver,
+  requestPassPurchase,     // Changed from purchasePass
+  requestPassUpgrade,      // Changed from upgradeToSupersaver
+  verifyPassOrder,         // New
+  rejectPassOrder,         // New
   getUserPassOrders,
   getAllPassOrders,
   getPassOrderDetails,
   getUserPassStatus,
 } from "../controllers/passOrder.controller.js";
 import { protect } from "../middlewares/auth.middleware.js";
+import { authorize } from "../middlewares/access.middleware.js";
 
 const router = express.Router();
 
-// --- Public Routes (Protected) ---
+// --- Public (Student/Outsider) Routes ---
+// Submit a purchase request (Pending)
+router.post("/purchase", protect, requestPassPurchase);
 
-// Purchase a new pass
-router.post("/purchase", protect, purchasePass);
+// Submit an upgrade request (Pending)
+router.post("/upgrade", protect, requestPassUpgrade);
 
-// Upgrade to supersaver
-router.post("/upgrade", protect, upgradeToSupersaver);
-
-// Get user's pass status and upgrade eligibility
+// Get my status and eligibility
 router.get("/status/:userId", protect, getUserPassStatus);
-
-// Get all pass orders for a user
 router.get("/user/:userId", protect, getUserPassOrders);
-
-// Get pass order details
 router.get("/orders/:orderId", protect, getPassOrderDetails);
 
-// --- Admin Routes ---
+// --- Admin Routes (Finance/Admin) ---
 
-// Get all pass orders with pagination and filters
-router.get("/", protect, getAllPassOrders);
+// View all orders (to find pending ones)
+router.get("/", protect, authorize("admin", "finance_team"), getAllPassOrders);
+
+// Verify/Approve Order
+router.put(
+    "/verify/:orderId", 
+    protect, 
+    authorize("admin", "finance_team"), 
+    verifyPassOrder
+);
+
+// Reject Order
+router.put(
+    "/reject/:orderId", 
+    protect, 
+    authorize("admin", "finance_team"), 
+    rejectPassOrder
+);
 
 export default router;

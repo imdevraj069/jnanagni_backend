@@ -7,12 +7,31 @@ import ApiResponse from "../utils/ApiResponse.js";
 // --- ADMIN: Create/Update Pass Configs ---
 export const createOrUpdatePass = asyncHandler(async (req, res) => {
     const { name, type, price, description } = req.body;
+    let qrCodePath;
 
-    // Upsert logic: if type exists, update it, otherwise create
+    if (req.file) {
+        qrCodePath = req.file.path;
+    }
+
+    // Validation: If creating new, QR is mandatory. If updating, it's optional (keep old).
+    if (!qrCodePath) {
+        const existing = await Pass.findOne({ type });
+        if (!existing) {
+             throw new ApiError(400, "QR Code image is required for a new pass.");
+        }
+    }
+
+    const updateData = { name, type, price, description, isActive: true };
+    
+    // Only update QR if a new file was uploaded
+    if (qrCodePath) {
+        updateData.qrCode = qrCodePath;
+    }
+
     const pass = await Pass.findOneAndUpdate(
         { type }, 
-        { name, type, price, description, isActive: true },
-        { new: true, upsert: true } // Upsert = Update if exists, Insert if not
+        updateData,
+        { new: true, upsert: true } 
     );
 
     res.status(200).json(new ApiResponse(200, pass, "Pass configured successfully"));

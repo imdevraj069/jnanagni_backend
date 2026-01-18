@@ -21,39 +21,39 @@ const passOrderSchema = new Schema(
       enum: ["purchase", "upgrade"],
       required: true,
     },
-    // For upgrades: track the previous pass that was upgraded from
     previousPassId: {
       type: Schema.Types.ObjectId,
       ref: "Pass",
       default: null,
     },
-    // Amount credited from previous pass (for upgrades)
     creditedAmount: {
       type: Number,
       default: 0,
     },
-    // Payment method
     paymentMethod: {
       type: String,
       enum: ["card", "upi", "netbanking", "wallet", "cash"],
       required: true,
     },
-    // Payment status
     paymentStatus: {
       type: String,
-      enum: ["pending", "completed", "failed", "refunded"],
+      enum: ["pending", "completed", "rejected"], // Removed 'failed', added 'rejected'
       default: "pending",
     },
-    // Transaction/Order ID from payment gateway (if applicable)
     transactionId: {
       type: String,
+      required: true, // UTR is now mandatory for this flow
+      unique: true,   // Ensure uniqueness
       trim: true,
     },
-    // Order notes or remarks
     remarks: {
-      type: String,
+      type: String, // User notes
       trim: true,
     },
+    adminComments: {
+      type: String, // Reason for rejection
+      trim: true
+    }
   },
   { timestamps: true }
 );

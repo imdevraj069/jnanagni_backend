@@ -51,20 +51,37 @@ export const registerForEvent = asyncHandler(async (req, res) => {
 
   const isOutsider = !['gkvian', 'fetian', 'faculty'].includes(user.role);
 
-  if (isOutsider && event.requiredPassType && event.requiredPassType !== 'none') {
-      
-      // FIX: Ensure array exists
-      if (!user.purchasedPasses || user.purchasedPasses.length === 0) {
-          throw new ApiError(403, `This event requires a ${event.requiredPassType} pass.`);
+  // LOGIC: If user is an outsider, they rely on 'purchasedPasses'. 
+  // Internal users might rely on global 'paymentStatus'.
+  
+  if (isOutsider) {
+      // 1. Check if event requires a pass
+      if (event.requiredPassType && event.requiredPassType !== 'none') {
+          
+          if (!user.purchasedPasses || user.purchasedPasses.length === 0) {
+              throw new ApiError(403, `This event requires a ${event.requiredPassType.toUpperCase()} pass. You have not purchased any passes.`);
+          }
+
+          // 2. Check for Specific Pass OR Supersaver
+          const hasAccess = user.purchasedPasses.some(pass => {
+              // Ensure we are checking populated pass objects
+              return pass.type === 'supersaver' || pass.type === event.requiredPassType;
+          });
+
+          if (!hasAccess) {
+              throw new ApiError(403, `Access Denied. You need a ${event.requiredPassType.toUpperCase()} pass or a Supersaver pass to register.`);
+          }
       }
-
-      const hasAccess = user.purchasedPasses.some(pass => {
-          // FIX: Add optional chaining just in case a pass was deleted from DB but remains in user array
-          return pass?.type === 'supersaver' || pass?.type === event.requiredPassType;
-      });
-
-      if (!hasAccess) {
-           throw new ApiError(403, `Your current passes do not cover this event. Required: ${event.requiredPassType} or Supersaver.`);
+      
+      // 3. For Outsiders, general paymentStatus must also be verified (usually set to true when pass is verified)
+      if (user.paymentStatus !== "verified") {
+        throw new ApiError(403, "Your account payment status is not verified.");
+      }
+  } else {
+      // INTERNAL USERS FLOW (GKV/FET)
+      // They just need the global payment verification (via the Google Form/Whatsapp flow)
+      if (user.paymentStatus !== "verified") {
+        throw new ApiError(403, "Payment not verified. Please contact finance team via WhatsApp.");
       }
   }
 
