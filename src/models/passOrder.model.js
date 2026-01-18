@@ -53,6 +53,11 @@ const passOrderSchema = new Schema(
     adminComments: {
       type: String, // Reason for rejection
       trim: true
+    },
+    status:{
+      type: String,
+      enum: ["pending", "verified", "rejected"],
+      default: "pending"
     }
   },
   { timestamps: true }

@@ -163,6 +163,7 @@ export const verifyPassOrder = asyncHandler(async (req, res) => {
   }
 
   order.paymentStatus = "completed";
+  order.status = "verified";
   await order.save();
 
   const user = await User.findById(order.userId._id);
