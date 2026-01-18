@@ -12,7 +12,11 @@ export const getUserByJnanagniId = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Jnanagni ID is required");
     }
 
-    const foundUser = await user.findOne({ jnanagniId }).select("-password -resetPasswordToken -verificationToken -verificationExpire -__v").lean();
+    // Populate passes to see eligibility at scan time
+    const foundUser = await user.findOne({ jnanagniId })
+        .select("-password -resetPasswordToken -verificationToken -verificationExpire -__v")
+        .populate("purchasedPasses") // <--- Added
+        .lean();
 
     if (!foundUser) {
         throw new ApiError(404, "User not found with this ID");
@@ -31,7 +35,9 @@ export const verifyPaymentStatus = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Jnanagni ID is required");
     }
 
-    const foundUser = await user.findOne({ jnanagniId }).select("paymentStatus name email jnanagniId");
+    const foundUser = await user.findOne({ jnanagniId })
+        .select("paymentStatus name email jnanagniId")
+        .populate("purchasedPasses"); // <--- Added
 
     if (!foundUser) {
         throw new ApiError(404, "User not found with this ID");
@@ -50,12 +56,12 @@ export const getAllUsers = asyncHandler(async (req, res) => {
     // Fetch paginated users
     const users = await user.find()
         .select("-password -resetPasswordToken -verificationToken -verificationExpire -__v")
-        .sort({ createdAt: -1 }) // Newest first
+        .populate("purchasedPasses") // <--- Added so Admin list shows badges/passes
+        .sort({ createdAt: -1 }) 
         .skip(skip)
         .limit(limit)
         .lean();
 
-    // Get total count for frontend calculations
     const totalDocs = await user.countDocuments();
 
     res.status(200).json(
@@ -83,7 +89,6 @@ export const changeUserRole = asyncHandler(async (req, res) => {
     }
 
     if (specialRoles) {
-        // Ensure it's an array for validation loop
         const rolesToCheck = Array.isArray(specialRoles) ? specialRoles : [specialRoles];
         
         const isInvalid = rolesToCheck.some(r => !validSpecialRoles.includes(r));
@@ -133,7 +138,10 @@ export const deleteUser = asyncHandler(async (req, res) => {
 export const getUserById = asyncHandler(async (req, res) => {
     const { id } = req.params;
 
-    const foundUser = await user.findById(id).select("-password -resetPasswordToken -verificationToken -verificationExpire -__v").lean();
+    const foundUser = await user.findById(id)
+        .select("-password -resetPasswordToken -verificationToken -verificationExpire -__v")
+        .populate("purchasedPasses") // <--- Added: Shows pass details in single user view
+        .lean();
 
     if (!foundUser) {
         throw new ApiError(404, "User not found");
@@ -152,7 +160,10 @@ export const getUsersByRole = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Invalid role specified");
     }
 
-    const users = await user.find({ role }).select("-password -resetPasswordToken -verificationToken -verificationExpire -__v").lean();
+    const users = await user.find({ role })
+        .select("-password -resetPasswordToken -verificationToken -verificationExpire -__v")
+        .populate("purchasedPasses") // <--- Added
+        .lean();
 
     res.status(200).json(
         new ApiResponse(200, users, `Users with role ${role} fetched successfully`)
@@ -167,7 +178,10 @@ export const getUsersBySpecialRole = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Invalid special role specified");
     }
 
-    const users = await user.find({ specialRoles: specialRole }).select("-password -resetPasswordToken -verificationToken -verificationExpire -__v").lean();
+    const users = await user.find({ specialRoles: specialRole })
+        .select("-password -resetPasswordToken -verificationToken -verificationExpire -__v")
+        .populate("purchasedPasses")
+        .lean();
 
     res.status(200).json(
         new ApiResponse(200, users, `Users with special role ${specialRole} fetched successfully`)
@@ -175,7 +189,9 @@ export const getUsersBySpecialRole = asyncHandler(async (req, res) => {
 });
 
 export const getUnverifiedUsers = asyncHandler(async (req, res) => {
-    const users = await user.find({ isVerified: false }).select("-password -resetPasswordToken -verificationToken -verificationExpire -__v").lean();
+    const users = await user.find({ isVerified: false })
+        .select("-password -resetPasswordToken -verificationToken -verificationExpire -__v")
+        .lean();
 
     res.status(200).json(
         new ApiResponse(200, users, "Unverified users fetched successfully")
@@ -186,6 +202,7 @@ export const getUserUnverifiedPayments = asyncHandler(async (req, res) => {
   const users = await user
     .find({ paymentStatus: { $ne: "verified" } })
     .select("-password -resetPasswordToken -verificationToken -verificationExpire -__v")
+    .populate("purchasedPasses")
     .lean();
 
   res.status(200).json(
@@ -197,7 +214,6 @@ export const getUserUnverifiedPayments = asyncHandler(async (req, res) => {
   );
 });
 
-
 export const verifyUserPayment = asyncHandler(async (req, res) => {
     const { id } = req.params;
 
@@ -206,26 +222,22 @@ export const verifyUserPayment = asyncHandler(async (req, res) => {
     if (!foundUser) {
         throw new ApiError(404, "User not found");
     }
-    // check if payment is already verified
+    
     if (foundUser.paymentStatus === "verified") {
         throw new ApiError(400, "User payment is already verified");
     }
-    // check if email is not verified
+    
     if (!foundUser.isVerified) {
         throw new ApiError(400, "User email is not verified. Cannot verify payment.");
     }
 
-    // Update payment status to verified
-
     foundUser.paymentStatus = "verified";
     await foundUser.save();
 
-    // Send payment verification email
     try {
         await sendPaymentVerificationEmail(foundUser.email, foundUser.name, foundUser.jnanagniId);
     } catch (error) {
         console.error("Payment verification email failed:", error);
-        // Don't throw error if email fails - payment is already verified in DB
     }
 
     res.status(200).json(
