@@ -1,4 +1,5 @@
 import { Pass } from "../models/pass.model.js";
+import { PassOrder } from "../models/passOrder.model.js"
 import User from "../models/user.model.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
@@ -106,6 +107,15 @@ export const deletePass = asyncHandler(async (req, res) => {
     
     // Remove reference from all users
     await User.updateMany({ purchasedPasses: passId }, { $pull: { purchasedPasses: passId } });
+
+    //delete all related pass orders after taking bakup of them
+    const relatedOrders = await PassOrder.find({ pass: passId });
+    //save records in upload directory upload/backup/passOrders_backup_<timestamp>.json
+    const fs = await import('fs');
+    const path = `./uploads/backup/passOrders_backup_${Date.now()}.json`;
+    fs.writeFileSync(path, JSON.stringify(relatedOrders, null, 2));
+
+    await PassOrder.deleteMany({ pass: passId });
     
     // Delete the pass document
     await Pass.findByIdAndDelete(passId);
