@@ -291,5 +291,3 @@ adminRouter.post(
 );
 
 export { adminRouter };
-
-export { adminRouter };

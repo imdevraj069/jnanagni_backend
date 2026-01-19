@@ -107,7 +107,7 @@ app.use(
 const corsOptions = {
 
   // Define the allowed origin(s). '*' is a fallback for development.
-  origin: "*",
+  origin: ["http://localhost:3000","https://jnanagni.in","https://admin.jnanagni.in","https://esport.jnanagni.in"],
 
   // Allow browsers to send credentials (e.g., cookies) with requests
   credentials: true,
