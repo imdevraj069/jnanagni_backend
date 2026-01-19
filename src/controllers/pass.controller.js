@@ -4,45 +4,57 @@ import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 
-// --- ADMIN: Create/Update Pass Configs ---
+// ==========================================
+// ADMIN: CREATE / EDIT / UPDATE PASS
+// ==========================================
 export const createOrUpdatePass = asyncHandler(async (req, res) => {
     const { name, type, price, description } = req.body;
-    let qrCodePath;
-
-    if (req.file) {
-        qrCodePath = req.file.path;
-    }
-
-    // Validation: If creating new, QR is mandatory. If updating, it's optional (keep old).
-    if (!qrCodePath) {
-        const existing = await Pass.findOne({ type });
-        if (!existing) {
-             throw new ApiError(400, "QR Code image is required for a new pass.");
-        }
-    }
-
-    const updateData = { name, type, price, description, isActive: true };
     
-    // Only update QR if a new file was uploaded
-    if (qrCodePath) {
-        updateData.qrCode = qrCodePath;
+    // 1. Determine UPI ID: Use body value OR env fallback
+    const reqUpiId = req.body.upiId || process.env.DEFAULT_UPI_ID;
+
+    // 2. Prepare base update data
+    const updateData = { name, type, price, description, isActive: true };
+
+    // 3. Handle Payment URL Logic
+    if (reqUpiId) {
+        // CASE A: We have a UPI ID (New Pass OR Updating UPI)
+        updateData.upiId = reqUpiId;
+        updateData.paymentUrl = `upi://pay?pa=${reqUpiId}&pn=Jnanagni&am=${price}&cu=INR`;
+    } else {
+        // CASE B: No UPI ID provided (Updating Price/Description only?)
+        // We MUST fetch the existing pass to get the old UPI ID so we can update the price in the URL.
+        const existingPass = await Pass.findOne({ type });
+
+        if (!existingPass) {
+             throw new ApiError(400, "UPI ID is required to create a new pass configuration.");
+        }
+        
+        // Re-generate URL with NEW price but OLD UPI ID
+        updateData.paymentUrl = `upi://pay?pa=${existingPass.upiId}&pn=Jnanagni&am=${price}&cu=INR`;
     }
 
+    // 4. Perform Update (Upsert = Create if not exists, Update if exists)
     const pass = await Pass.findOneAndUpdate(
         { type }, 
         updateData,
-        { new: true, upsert: true } 
+        { new: true, upsert: true, setDefaultsOnInsert: true } 
     );
 
     res.status(200).json(new ApiResponse(200, pass, "Pass configured successfully"));
 });
 
+// ==========================================
+// PUBLIC: GET ALL PASSES
+// ==========================================
 export const getAllPasses = asyncHandler(async (req, res) => {
     const passes = await Pass.find({ isActive: true });
     res.status(200).json(new ApiResponse(200, passes, "Passes fetched"));
 });
 
-// --- USER/ADMIN: Assign Pass to User (Simulate Purchase) ---
+// ==========================================
+// ADMIN: MANUAL ASSIGNMENT
+// ==========================================
 export const assignPassToUser = asyncHandler(async (req, res) => {
     const { userId, passId } = req.body; 
 
@@ -52,7 +64,6 @@ export const assignPassToUser = asyncHandler(async (req, res) => {
     const pass = await Pass.findById(passId);
     if (!pass) throw new ApiError(404, "Pass configuration not found");
 
-    // 1. Check if user already has this specific pass
     const alreadyHasPass = user.purchasedPasses.some(
         (ownedPassId) => ownedPassId.toString() === pass._id.toString()
     );
@@ -62,15 +73,6 @@ export const assignPassToUser = asyncHandler(async (req, res) => {
     }
 
     user.purchasedPasses.push(pass._id);
-
-    // 2. Logic for Supersaver (The "Upgrade")
-    // If user buys Supersaver, we can optionally clear other passes since Supersaver covers all
-    // OR we just push it. Pushing it is safer for history tracking.
-    
-    // 3. Add the pass
-    user.purchasedPasses.push(pass._id);
-    
-    // 4. Ensure payment status is verified
     user.paymentStatus = "verified"; 
     
     await user.save();
@@ -78,37 +80,34 @@ export const assignPassToUser = asyncHandler(async (req, res) => {
     res.status(200).json(new ApiResponse(200, user, `Pass '${pass.name}' added to user account.`));
 });
 
+// ==========================================
+// ADMIN: REVOKE PASS
+// ==========================================
 export const removePassFromUser = asyncHandler(async (req, res) => {
     const { userId, passId } = req.body;
-
     const user = await User.findById(userId);
     if (!user) throw new ApiError(404, "User not found");
-
-    // Filter out the pass to remove
-    user.purchasedPasses = user.purchasedPasses.filter(
-        id => id.toString() !== passId
-    );
-
+    
+    user.purchasedPasses = user.purchasedPasses.filter(id => id.toString() !== passId);
     await user.save();
+    
     res.status(200).json(new ApiResponse(200, user, "Pass removed successfully"));
 });
 
-// --- ADMIN: Delete Pass (removes from all users) ---
+// ==========================================
+// ADMIN: DELETE PASS CONFIG
+// ==========================================
 export const deletePass = asyncHandler(async (req, res) => {
     const { passId } = req.body;
-
-    // Verify the pass exists before deleting
+    
     const pass = await Pass.findById(passId);
     if (!pass) throw new ApiError(404, "Pass not found");
-
-    // Remove the pass from all users who have it
-    await User.updateMany(
-        { purchasedPasses: passId },
-        { $pull: { purchasedPasses: passId } }
-    );
-
-    // Delete the pass itself
+    
+    // Remove reference from all users
+    await User.updateMany({ purchasedPasses: passId }, { $pull: { purchasedPasses: passId } });
+    
+    // Delete the pass document
     await Pass.findByIdAndDelete(passId);
-
-    res.status(200).json(new ApiResponse(200, null, "Pass deleted successfully and removed from all users"));
+    
+    res.status(200).json(new ApiResponse(200, null, "Pass deleted successfully"));
 });

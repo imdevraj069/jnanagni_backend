@@ -5,22 +5,32 @@ const passSchema = new Schema(
     name: { 
       type: String, 
       required: true 
-    }, // e.g., "Gamer's Pass", "All Access"
+    }, 
     type: {
       type: String,
       enum: ["egames", "workshop", "edm", "supersaver"],
       required: true,
-      unique: true // Ensure only one active pass configuration per type exists
+      unique: true 
     },
     price: { 
       type: Number, 
       required: true 
     },
     description: String,
-    qrCode: { 
-      type: String, // Path to the uploaded QR image
-      required: true // Admin must upload a QR for payment
+    
+    // CHANGED: Replaced qrCode image path with UPI ID
+    upiId: {
+      type: String,
+      required: true, 
+      trim: true
     },
+    
+    // NEW: The full string string used to generate the QR on frontend
+    // Format: upi://pay?pa={upiId}&am={price}
+    paymentUrl: {
+      type: String
+    },
+
     isActive: { 
       type: Boolean, 
       default: true 
@@ -28,5 +38,18 @@ const passSchema = new Schema(
   },
   { timestamps: true }
 );
+
+// Pre-save hook to auto-generate the paymentUrl if upiId or price changes
+passSchema.pre('save', function(next) {
+    if (this.isModified('upiId') || this.isModified('price')) {
+        // Construct standard UPI intent link
+        // pa = payee address (UPI ID)
+        // pn = payee name (Optional, using Jnanagni)
+        // am = amount
+        // cu = currency
+        this.paymentUrl = `upi://pay?pa=${this.upiId}&pn=Jnanagni&am=${this.price}&cu=INR`;
+    }
+    next();
+});
 
 export const Pass = mongoose.model("Pass", passSchema);

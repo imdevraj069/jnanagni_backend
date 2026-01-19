@@ -20,7 +20,7 @@ passRouter.post(
   "/config",
   protect,
   authorize("admin", "finance_team"),
-  upload.single('qrCode'), // to upload qr code image
+  // upload.single('qrCode'), // to upload qr code image
   createOrUpdatePass,
 );
 
