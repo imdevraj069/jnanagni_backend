@@ -8,6 +8,7 @@ import ApiResponse from "../utils/ApiResponse.js";
 // ADMIN: CREATE / EDIT / UPDATE PASS
 // ==========================================
 export const createOrUpdatePass = asyncHandler(async (req, res) => {
+    console.log(req.body);
     const { name, type, price, description } = req.body;
     
     // 1. Determine UPI ID: Use body value OR env fallback
