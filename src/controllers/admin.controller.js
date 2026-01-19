@@ -5,6 +5,7 @@ import asyncHandler from "../utils/asyncHandler.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import ApiError from "../utils/ApiError.js";
 import { sendWelcomeEmail } from "../services/email.service.js";
+import { sendTeamIncompleteAlert } from "../services/notification.service.js";
 
 // --- DASHBOARD OVERVIEW STATS ---
 export const getDashboardStats = asyncHandler(async (req, res) => {
@@ -140,5 +141,69 @@ export const adminVerifyUserEmail = asyncHandler(async (req, res) => {
 
     res.status(200).json(
         new ApiResponse(200, { user: userRecord }, "User email verified successfully by admin")
+    );
+});
+
+
+// ==========================================
+// ALERT TEAMS WITH INCOMPLETE ROSTERS
+// ==========================================
+export const alertIncompleteTeams = asyncHandler(async (req, res) => {
+    const { eventId } = req.params;
+
+    // 1. Fetch Event to get MinTeamSize
+    const event = await Event.findById(eventId);
+    if (!event) throw new ApiError(404, "Event not found");
+
+    if (event.participationType !== 'group') {
+        throw new ApiError(400, "This is not a group event. No teams to alert.");
+    }
+
+    const minSize = event.minTeamSize || 2;
+
+    // 2. Find All Active Registrations for this Event
+    // We populate the leader to get their email
+    const allRegistrations = await Registration.find({ 
+        event: eventId, 
+        status: 'active' 
+    }).populate("registeredBy", "name email");
+
+    const alertsSent = [];
+    const failedAlerts = [];
+
+    // 3. Filter & Send
+    for (const reg of allRegistrations) {
+        // Calculate Size: Leader (1) + Accepted Members
+        const acceptedMembers = reg.teamMembers.filter(m => m.status === 'accepted').length;
+        const currentSize = 1 + acceptedMembers;
+
+        if (currentSize < minSize) {
+            // TEAM IS INCOMPLETE -> SEND MAIL
+            try {
+                if (reg.registeredBy && reg.registeredBy.email) {
+                    await sendTeamIncompleteAlert(
+                        reg.registeredBy.email,
+                        reg.registeredBy.name,
+                        reg.teamName,
+                        event.name,
+                        currentSize,
+                        minSize
+                    );
+                    alertsSent.push({ team: reg.teamName, leader: reg.registeredBy.email });
+                }
+            } catch (error) {
+                console.error(`Failed to email team ${reg.teamName}:`, error);
+                failedAlerts.push(reg.teamName);
+            }
+        }
+    }
+
+    res.status(200).json(
+        new ApiResponse(200, {
+            totalChecked: allRegistrations.length,
+            alertsSentCount: alertsSent.length,
+            alertsSentDetails: alertsSent,
+            failedCount: failedAlerts.length
+        }, `Sent alerts to ${alertsSent.length} incomplete teams.`)
     );
 });

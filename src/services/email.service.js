@@ -7,6 +7,7 @@ import { getTeamInviteTemplate } from '../templates/teamInviteEmail.js';
 import { getPaymentVerificationTemplate } from '../templates/paymentVerificationEmail.js';
 import { getPassPurchaseTemplate } from '../templates/passPurchaseEmail.js';
 import { getPassRejectionTemplate } from '../templates/passRejectionEmail.js';
+import { getIncompleteTeamTemplate } from '../templates/incompleteTeamEmail.js';
 
 // ==========================================
 // 1. CONFIGURE TRANSPORTERS
@@ -202,5 +203,16 @@ export const sendPassRejectionEmail = async (user, pass, reason) => {
       subject: `Update on your ${pass.name} Request`,
       html: getPassRejectionTemplate(user.name, pass.name, reason),
       fromOverride: "Jnanagni Finance"
+    });
+};
+
+// --- TEAM MANAGEMENT ALERTS (Uses: INFO_EMAIL_USER) ---
+export const sendTeamIncompleteAlert = async (email, leaderName, teamName, eventName, currentSize, minSize) => {
+    // Uses 'noreply' or 'info' channel
+    await sendDistributedMail('info', {
+      to: email,
+      subject: `URGENT: Your Team "${teamName}" is Ineligible for ${eventName}`,
+      html: getIncompleteTeamTemplate(leaderName, teamName, eventName, currentSize, minSize),
+      fromOverride: "Jnanagni Events"
     });
 };

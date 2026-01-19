@@ -39,6 +39,8 @@ import {
   updateVolunteerRequestStatus,
 } from "../controllers/volunteerRequest.controller.js";
 
+import { alertIncompleteTeams } from "../controllers/admin.controller.js"; // Import alert function
+
 const adminRouter = Router();
 
 // Apply global protection to all admin routes
@@ -276,5 +278,18 @@ adminRouter.get('/registrations',
     authorize('admin', 'finance_team'),
     getAllRegistrations
 );
+
+// ==========================================
+// TEAM ALERTS
+// ==========================================
+// Notify teams that don't meet minimum size requirements
+adminRouter.post(
+    '/events/:eventId/alert-incomplete', 
+    authorize('admin', 'category_lead', 'event_coordinator'), 
+    verifyEventAuthority, 
+    alertIncompleteTeams
+);
+
+export { adminRouter };
 
 export { adminRouter };
