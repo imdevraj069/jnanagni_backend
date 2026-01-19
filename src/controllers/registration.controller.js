@@ -157,7 +157,6 @@ export const inviteMember = asyncHandler(async (req, res) => {
   const { registrationId } = req.params;
   const { email, jnanagniId } = req.body; // Can invite by either
   const leader = req.user;
-  const isOutsider = !["gkvian", "fetian", "faculty"].includes(leader.role);
 
   // 1. Find Registration & Verify Authority
   const registration = await Registration.findOne({
@@ -166,7 +165,7 @@ export const inviteMember = asyncHandler(async (req, res) => {
   });
   if (!registration) throw new ApiError(403, "Team not found or unauthorized.");
 
-  const event = await Event.findById(registration.event);
+  const event = await Event.findById(registration.event).populate("requiredPassType");
   const passRequired = event.requiredPassType;
 
   // 2. Check Team Size Limit
@@ -178,7 +177,7 @@ export const inviteMember = asyncHandler(async (req, res) => {
 
   // 3. Find Target User
   const query = jnanagniId ? { jnanagniId } : { email };
-  const invitee = await User.findOne(query);
+  const invitee = await User.findOne(query).populate("purchasedPasses");
   const inviteeIsOutsider =
     invitee && !["gkvian", "fetian", "faculty"].includes(invitee.role);
   if (!invitee) throw new ApiError(404, "User to invite not found.");
@@ -264,7 +263,7 @@ export const inviteMember = asyncHandler(async (req, res) => {
 export const respondToInvite = asyncHandler(async (req, res) => {
   const registrationId = await req.params.registrationId;
   let { status, submissionData } = req.body; // submissionData for memberFields
-  const user = req.user;
+  const user = req.user.populate("purchasedPasses");
 
   // Parse submission data if it's a string (from frontend JSON.stringify)
   if (typeof submissionData === "string") {
