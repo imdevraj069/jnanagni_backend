@@ -22,7 +22,10 @@ const checkDuplicateRegistration = async (userId, eventId) => {
     ],
   });
   if (existing) {
-    throw new ApiError(400, "This user is already registered for this event. A user cannot be in multiple teams for the same event.");
+    throw new ApiError(
+      400,
+      "This user is already registered for this event. A user cannot be in multiple teams for the same event.",
+    );
   }
 };
 
@@ -49,40 +52,50 @@ export const registerForEvent = asyncHandler(async (req, res) => {
   if (!event.isRegistrationOpen)
     throw new ApiError(400, "Registration is closed.");
 
-  const isOutsider = !['gkvian', 'fetian', 'faculty'].includes(user.role);
+  const isOutsider = !["gkvian", "fetian", "faculty"].includes(user.role);
 
-  // LOGIC: If user is an outsider, they rely on 'purchasedPasses'. 
+  // LOGIC: If user is an outsider, they rely on 'purchasedPasses'.
   // Internal users might rely on global 'paymentStatus'.
-  
+
   if (isOutsider) {
-      // 1. Check if event requires a pass
-      if (event.requiredPassType && event.requiredPassType !== 'none') {
-          
-          if (!user.purchasedPasses || user.purchasedPasses.length === 0) {
-              throw new ApiError(403, `This event requires a ${event.requiredPassType.toUpperCase()} pass. You have not purchased any passes.`);
-          }
-
-          // 2. Check for Specific Pass OR Supersaver
-          const hasAccess = user.purchasedPasses.some(pass => {
-              // Ensure we are checking populated pass objects
-              return pass.type === 'supersaver' || pass.type === event.requiredPassType;
-          });
-
-          if (!hasAccess) {
-              throw new ApiError(403, `Access Denied. You need a ${event.requiredPassType.toUpperCase()} pass or a Supersaver pass to register.`);
-          }
+    // 1. Check if event requires a pass
+    if (event.requiredPassType && event.requiredPassType !== "none") {
+      if (!user.purchasedPasses || user.purchasedPasses.length === 0) {
+        throw new ApiError(
+          403,
+          `This event requires a ${event.requiredPassType.toUpperCase()} pass. You have not purchased any passes.`,
+        );
       }
-      
-      // 3. For Outsiders, general paymentStatus must also be verified (usually set to true when pass is verified)
-      if (user.paymentStatus !== "verified") {
-        throw new ApiError(403, "Your account payment status is not verified.");
+
+      // 2. Check for Specific Pass OR Supersaver
+      const hasAccess = user.purchasedPasses.some((pass) => {
+        // Ensure we are checking populated pass objects
+        return (
+          pass.type === "supersaver" || pass.type === event.requiredPassType
+        );
+      });
+
+      if (!hasAccess) {
+        throw new ApiError(
+          403,
+          `Access Denied. You need a ${event.requiredPassType.toUpperCase()} pass or a Supersaver pass to register.`,
+        );
       }
+    }
+
+    // 3. For Outsiders, general paymentStatus must also be verified (usually set to true when pass is verified)
+    if (user.paymentStatus !== "verified") {
+      throw new ApiError(403, "Your account payment status is not verified.");
+    }
   } else {
-      // INTERNAL USERS FLOW (GKV/FET)
-      // They just need the global payment verification (via the Google Form/Whatsapp flow)
-      if (user.paymentStatus !== "verified") {
-        throw new ApiError(403, "Payment not verified. Please contact finance team via WhatsApp.");
-      }
+    // INTERNAL USERS FLOW (GKV/FET)
+    // They just need the global payment verification (via the Google Form/Whatsapp flow)
+    if (user.paymentStatus !== "verified") {
+      throw new ApiError(
+        403,
+        "Payment not verified. Please contact finance team via WhatsApp.",
+      );
+    }
   }
 
   // 3. Payment Check (Mandatory)
@@ -110,7 +123,8 @@ export const registerForEvent = asyncHandler(async (req, res) => {
     const newReg = await Registration.create({
       registeredBy: user._id,
       event: eventId,
-      teamName: submissionData.teamName || teamName || `Team_${user.jnanagniId}`,
+      teamName:
+        submissionData.teamName || teamName || `Team_${user.jnanagniId}`,
       submissionData,
       teamMembers: [], // Starts empty
     });
@@ -143,6 +157,7 @@ export const inviteMember = asyncHandler(async (req, res) => {
   const { registrationId } = req.params;
   const { email, jnanagniId } = req.body; // Can invite by either
   const leader = req.user;
+  const isOutsider = !["gkvian", "fetian", "faculty"].includes(leader.role);
 
   // 1. Find Registration & Verify Authority
   const registration = await Registration.findOne({
@@ -152,6 +167,7 @@ export const inviteMember = asyncHandler(async (req, res) => {
   if (!registration) throw new ApiError(403, "Team not found or unauthorized.");
 
   const event = await Event.findById(registration.event);
+  const passRequired = event.requiredPassType;
 
   // 2. Check Team Size Limit
   const currentSize =
@@ -163,22 +179,55 @@ export const inviteMember = asyncHandler(async (req, res) => {
   // 3. Find Target User
   const query = jnanagniId ? { jnanagniId } : { email };
   const invitee = await User.findOne(query);
+  const inviteeIsOutsider =
+    invitee && !["gkvian", "fetian", "faculty"].includes(invitee.role);
   if (!invitee) throw new ApiError(404, "User to invite not found.");
 
   // 4. Constraints on Invitee
   if (invitee._id.toString() === leader._id.toString())
     throw new ApiError(400, "You cannot invite yourself to a team.");
   if (invitee.paymentStatus !== "verified")
-    throw new ApiError(400, "Cannot invite this user - their payment has not been verified yet.");
+    throw new ApiError(
+      400,
+      "Cannot invite this user - their payment has not been verified yet.",
+    );
+
+  //check if user passes contains supersaver type or pass type required for event only for outsiders
+  if (inviteeIsOutsider) {
+    if (passRequired && passRequired !== "none") {
+      if (!invitee.purchasedPasses || invitee.purchasedPasses.length === 0) {
+        throw new ApiError(
+          403,
+          `This event requires a ${passRequired.toUpperCase()} pass. The user has not purchased any passes.`,
+        );
+      }
+
+      // 2. Check for Specific Pass OR Supersaver
+      const hasAccess = invitee.purchasedPasses.some((pass) => {
+        // Ensure we are checking populated pass objects
+        return pass.type === "supersaver" || pass.type === passRequired;
+      });
+
+      if (!hasAccess) {
+        throw new ApiError(
+          403,
+          `Access Denied. The user needs a ${passRequired.toUpperCase()} pass or a Supersaver pass to join this team.`,
+        );
+      }
+    }
+  }
 
   // Check if already in this team
   const inTeam = registration.teamMembers.find(
-    (m) => m.email === invitee.email
+    (m) => m.email === invitee.email,
   );
   if (inTeam && inTeam.status === "accepted")
     throw new ApiError(400, "This user is already a member of your team.");
   if (inTeam && inTeam.status === "pending")
-    throw new ApiError(400, "An invitation has already been sent to this user for your team.");
+    throw new ApiError(
+      400,
+      "An invitation has already been sent to this user for your team.",
+    );
 
   // Check if in ANOTHER team for the same event
   await checkDuplicateRegistration(invitee._id, event._id);
@@ -196,7 +245,7 @@ export const inviteMember = asyncHandler(async (req, res) => {
       invitee.email,
       leader.name,
       registration.teamName,
-      event.name
+      event.name,
     );
   } catch (error) {
     console.error("Failed to send invite email:", error);
@@ -226,32 +275,63 @@ export const respondToInvite = asyncHandler(async (req, res) => {
     }
   }
 
-  if (!['accepted', 'rejected'].includes(status)) {
-    throw new ApiError(400, 'Invalid status');
+  if (!["accepted", "rejected"].includes(status)) {
+    throw new ApiError(400, "Invalid status");
   }
 
-  if (!submissionData && status === 'accepted') {
-    throw new ApiError(400, 'Submission data is required');
+  if (!submissionData && status === "accepted") {
+    throw new ApiError(400, "Submission data is required");
   }
 
-  const registration = await Registration.findById(registrationId).populate('event');
+  const registration =
+    await Registration.findById(registrationId).populate("event");
 
   if (!registration) {
-    throw new ApiError(404, 'Registration not found');
+    throw new ApiError(404, "Registration not found");
+  }
+
+  //check if event requires a pass and if user has that pass
+  const event = registration.event;
+  const passRequired = event.requiredPassType;
+  const isOutsider = !["gkvian", "fetian", "faculty"].includes(user.role);
+
+  if (isOutsider) {
+    if (passRequired && passRequired !== "none") {
+      if (!user.purchasedPasses || user.purchasedPasses.length === 0) {
+        throw new ApiError(
+          403,
+          `This event requires a ${passRequired.toUpperCase()} pass. You have not purchased any passes.`,
+        );
+      }
+
+      // 2. Check for Specific Pass OR Supersaver
+      const hasAccess = user.purchasedPasses.some((pass) => {
+        // Ensure we are checking populated pass objects
+        return pass.type === "supersaver" || pass.type === passRequired;
+      });
+
+      if (!hasAccess) {
+        throw new ApiError(
+          403,
+          `Access Denied. You need a ${passRequired.toUpperCase()} pass or a Supersaver pass to join this team.`,
+        );
+      }
+    }
   }
 
   // Find the invite within the array
   const memberIndex = registration.teamMembers.findIndex(
-    (m) => m.user?.toString() === user._id.toString() || m.email === user.email
+    (m) => m.user?.toString() === user._id.toString() || m.email === user.email,
   );
-  
+
   // verify if the team limit is not exceeded on acceptance
-  if (status === 'accepted') {
+  if (status === "accepted") {
     const event = await Event.findById(registration.event);
     const currentSize =
-      1 + registration.teamMembers.filter((m) => m.status === "accepted").length; // Leader + Accepted
+      1 +
+      registration.teamMembers.filter((m) => m.status === "accepted").length; // Leader + Accepted
 
-      //  Check Team Size Limit
+    //  Check Team Size Limit
     if (currentSize >= event.maxTeamSize) {
       //  if team is already full
       throw new ApiError(400, `Team limit reached (Max: ${event.maxTeamSize})`);
@@ -259,16 +339,16 @@ export const respondToInvite = asyncHandler(async (req, res) => {
   }
 
   if (memberIndex === -1) {
-    throw new ApiError(403, 'You were not invited to this team');
+    throw new ApiError(403, "You were not invited to this team");
   }
 
   // Payment check
-  if (user.paymentStatus !== 'verified') {
-    throw new ApiError(403, 'Payment not verified');
+  if (user.paymentStatus !== "verified") {
+    throw new ApiError(403, "Payment not verified");
   }
 
   // Double check duplicate registration before accepting
-  if (status === 'accepted') {
+  if (status === "accepted") {
     await checkDuplicateRegistration(user._id, registration.event._id);
   }
 
@@ -277,17 +357,16 @@ export const respondToInvite = asyncHandler(async (req, res) => {
   registration.teamMembers[memberIndex].user = user._id;
 
   // STORE MEMBER SUBMISSION DATA (for memberFields)
-  if (status === 'accepted' && submissionData) {
+  if (status === "accepted" && submissionData) {
     registration.teamMembers[memberIndex].submissionData = submissionData;
   }
 
   await registration.save();
 
-  res.status(200).json(
-    new ApiResponse(200, registration, 'Invitation status updated')
-  );
+  res
+    .status(200)
+    .json(new ApiResponse(200, registration, "Invitation status updated"));
 });
-
 
 // ==========================================
 // 4. REMOVE MEMBER (Leader Only)
@@ -304,7 +383,7 @@ export const removeMember = asyncHandler(async (req, res) => {
 
   // Filter out the member
   registration.teamMembers = registration.teamMembers.filter(
-    (m) => m.user.toString() !== memberId
+    (m) => m.user.toString() !== memberId,
   );
 
   await registration.save();
@@ -434,22 +513,22 @@ export const getRegistrationsByUser = async (req, res) => {
     const registrations = await Registration.find({
       $or: [
         { registeredBy: userId },
-        { 
-          teamMembers: { 
-            $elemMatch: { 
-              user: userId, 
-              status: "accepted" 
-            } 
-          }
-        }
+        {
+          teamMembers: {
+            $elemMatch: {
+              user: userId,
+              status: "accepted",
+            },
+          },
+        },
       ],
-      status: "active"
+      status: "active",
     })
       .populate("registeredBy", "name email")
       .populate("event")
       .populate("teamMembers.user", "name email jnanagniId")
       .lean();
-    
+
     res.status(200).json(registrations);
   } catch (error) {
     res
@@ -494,19 +573,22 @@ export const updateRegistrationSubmissionData = async (req, res) => {
   }
 };
 
-
 // get all registrations (admin)
 export const getAllRegistrations = async (req, res) => {
   try {
-
     const registrations = await Registration.find()
       .populate("registeredBy", "name email jnanagniId contactNo")
       .populate("event")
       .sort({ createdAt: -1 })
       .lean();
 
-    res.status(200).json({message: "All registrations fetched successfully", registrations});
+    res
+      .status(200)
+      .json({
+        message: "All registrations fetched successfully",
+        registrations,
+      });
   } catch (error) {
     res.status(500).json({ message: "Error fetching registrations", error });
   }
-}
+};
