@@ -5,7 +5,7 @@ import asyncHandler from "../utils/asyncHandler.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import ApiError from "../utils/ApiError.js";
 import { sendWelcomeEmail } from "../services/email.service.js";
-import { sendTeamIncompleteAlert } from "../services/notification.service.js";
+import { sendTeamIncompleteAlert } from "../services/email.service.js";
 
 // --- DASHBOARD OVERVIEW STATS ---
 export const getDashboardStats = asyncHandler(async (req, res) => {
