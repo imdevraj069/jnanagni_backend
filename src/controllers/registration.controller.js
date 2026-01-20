@@ -298,6 +298,7 @@ export const respondToInvite = asyncHandler(async (req, res) => {
   const registrationId = await req.params.registrationId;
   let { status, submissionData } = req.body; // submissionData for memberFields
   const user = req.user.populate("purchasedPasses");
+  console.log(user)
 
 
   // validate max event limit for the user leader is inviting to
