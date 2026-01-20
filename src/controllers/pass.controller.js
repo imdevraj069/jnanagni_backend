@@ -107,27 +107,42 @@ export const deletePass = asyncHandler(async (req, res) => {
     const pass = await Pass.findById(passId);
     if (!pass) throw new ApiError(404, "Pass not found");
     
-    // Remove reference from all users
-    await User.updateMany({ purchasedPasses: passId }, { $pull: { purchasedPasses: passId } });
+    // 1. Remove reference from all users
+    await User.updateMany(
+        { purchasedPasses: passId }, 
+        { $pull: { purchasedPasses: passId } }
+    );
 
-    // 1. Fetch related orders
-    const relatedOrders = await PassOrder.find({ pass: passId });
+    // 2. Fetch related orders using the CORRECT field name (passId)
+    const relatedOrders = await PassOrder.find({ passId: passId });
 
-    // 2. DEFINE DIRECTORY PATHS SAFELY
-    const backupDir = path.join(process.cwd(), "uploads", "backup");
-    
-    // 3. CREATE DIRECTORY IF IT DOESN'T EXIST (The Fix)
-    if (!fs.existsSync(backupDir)) {
-        fs.mkdirSync(backupDir, { recursive: true });
+    // 3. Backup Logic: Ensure folder exists and write file
+    try {
+        const backupDir = path.join(process.cwd(), "uploads", "backup");
+        
+        // Create directory if it doesn't exist
+        if (!fs.existsSync(backupDir)) {
+            fs.mkdirSync(backupDir, { recursive: true });
+        }
+
+        const filePath = path.join(backupDir, `passOrders_backup_${Date.now()}.json`);
+        
+        // Write the actual found data
+        fs.writeFileSync(filePath, JSON.stringify(relatedOrders, null, 2));
+        console.log(`Backup created at: ${filePath}`);
+    } catch (error) {
+        console.error("Backup failed, proceeding with deletion anyway:", error);
     }
 
-    // 4. Write the file
-    const filePath = path.join(backupDir, `passOrders_backup_${Date.now()}.json`);
-    fs.writeFileSync(filePath, JSON.stringify(relatedOrders, null, 2));
-
-    // 5. Delete orders and pass
-    await PassOrder.deleteMany({ pass: passId });
+    // 4. Delete orders using the CORRECT field name (passId)
+    const deleteResult = await PassOrder.deleteMany({ passId: passId });
+    
+    // 5. Delete the pass document
     await Pass.findByIdAndDelete(passId);
     
-    res.status(200).json(new ApiResponse(200, null, "Pass deleted successfully"));
+    res.status(200).json(new ApiResponse(200, {
+        deletedPassId: passId,
+        ordersDeleted: deleteResult.deletedCount,
+        backupSize: relatedOrders.length
+    }, "Pass and related orders deleted successfully"));
 });
