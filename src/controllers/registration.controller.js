@@ -52,6 +52,24 @@ export const registerForEvent = asyncHandler(async (req, res) => {
   if (!event.isRegistrationOpen)
     throw new ApiError(400, "Registration is closed.");
 
+  // make sure user can participate max to 5 events as a leader or member
+  const userRegistrationsCount = await Registration.countDocuments({
+    $or: [
+      { registeredBy: user._id },
+      { teamMembers: { $elemMatch: { user: user._id, status: "accepted" } } },
+    ],
+    status: "active",
+  });
+
+  if (userRegistrationsCount >= 5) {
+    throw new ApiError(
+      400,
+      "You have reached the maximum limit of 5 active event registrations.",
+    );
+  }
+
+  // 3. Payment & Pass Check
+
   const isOutsider = !["gkvian", "fetian", "faculty"].includes(user.role);
 
   // LOGIC: If user is an outsider, they rely on 'purchasedPasses'.
@@ -168,6 +186,7 @@ export const inviteMember = asyncHandler(async (req, res) => {
   const event = await Event.findById(registration.event).populate("requiredPassType");
   const passRequired = event.requiredPassType;
 
+
   // 2. Check Team Size Limit
   const currentSize =
     1 + registration.teamMembers.filter((m) => m.status !== "rejected").length; // Leader + Pending/Accepted
@@ -181,6 +200,21 @@ export const inviteMember = asyncHandler(async (req, res) => {
   const inviteeIsOutsider =
     invitee && !["gkvian", "fetian", "faculty"].includes(invitee.role);
   if (!invitee) throw new ApiError(404, "User to invite not found.");
+
+
+
+  // validate max event limit for the user leader is inviting to
+  const inviteeRegistrationsCount = await Registration.countDocuments({
+    $or: [
+      { registeredBy: invitee._id },
+      { teamMembers: { $elemMatch: { user: invitee._id, status: "accepted" } } },
+    ],
+    status: "active",
+  });
+
+  if (inviteeRegistrationsCount >= 5) {
+    throw new ApiError(400, "User has reached maximum event limit.");
+  }
 
   // 4. Constraints on Invitee
   if (invitee._id.toString() === leader._id.toString())
@@ -264,6 +298,20 @@ export const respondToInvite = asyncHandler(async (req, res) => {
   const registrationId = await req.params.registrationId;
   let { status, submissionData } = req.body; // submissionData for memberFields
   const user = req.user.populate("purchasedPasses");
+
+
+  // validate max event limit for the user leader is inviting to
+  const userRegistrationsCount = await Registration.countDocuments({
+    $or: [
+      { registeredBy: user._id },
+      { teamMembers: { $elemMatch: { user: user._id, status: "accepted" } } },
+    ],
+    status: "active",
+  });
+
+  if (userRegistrationsCount >= 5) {
+    throw new ApiError(400, "User has reached maximum event limit.");
+  }
 
   // Parse submission data if it's a string (from frontend JSON.stringify)
   if (typeof submissionData === "string") {
