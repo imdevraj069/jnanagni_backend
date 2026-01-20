@@ -4,6 +4,8 @@ import User from "../models/user.model.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
+import fs from "fs";
+import path from "path";
 
 // ==========================================
 // ADMIN: CREATE / EDIT / UPDATE PASS
@@ -108,16 +110,23 @@ export const deletePass = asyncHandler(async (req, res) => {
     // Remove reference from all users
     await User.updateMany({ purchasedPasses: passId }, { $pull: { purchasedPasses: passId } });
 
-    //delete all related pass orders after taking bakup of them
+    // 1. Fetch related orders
     const relatedOrders = await PassOrder.find({ pass: passId });
-    //save records in upload directory upload/backup/passOrders_backup_<timestamp>.json
-    const fs = await import('fs');
-    const path = `./uploads/backup/passOrders_backup_${Date.now()}.json`;
-    fs.writeFileSync(path, JSON.stringify(relatedOrders, null, 2));
 
-    await PassOrder.deleteMany({ pass: passId });
+    // 2. DEFINE DIRECTORY PATHS SAFELY
+    const backupDir = path.join(process.cwd(), "uploads", "backup");
     
-    // Delete the pass document
+    // 3. CREATE DIRECTORY IF IT DOESN'T EXIST (The Fix)
+    if (!fs.existsSync(backupDir)) {
+        fs.mkdirSync(backupDir, { recursive: true });
+    }
+
+    // 4. Write the file
+    const filePath = path.join(backupDir, `passOrders_backup_${Date.now()}.json`);
+    fs.writeFileSync(filePath, JSON.stringify(relatedOrders, null, 2));
+
+    // 5. Delete orders and pass
+    await PassOrder.deleteMany({ pass: passId });
     await Pass.findByIdAndDelete(passId);
     
     res.status(200).json(new ApiResponse(200, null, "Pass deleted successfully"));
