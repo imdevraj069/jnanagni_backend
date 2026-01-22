@@ -52,6 +52,10 @@ const resultSchema = new Schema(
     published: { type: Boolean, default: false },
     publishedBy: { type: Schema.Types.ObjectId, ref: "User" },
     publishedAt: { type: Date },
+    
+    // NEW: Track who created/edited the draft results
+    createdBy: { type: Schema.Types.ObjectId, ref: "User" },
+    createdAt: { type: Date },
   },
   { timestamps: true }
 );

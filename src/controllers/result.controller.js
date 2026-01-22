@@ -86,9 +86,9 @@ export const getRounds = asyncHandler(async (req, res) => {
 });
 
 // ==========================================
-// 4. PUBLISH RESULTS & SELECT QUALIFIERS
+// 4. CREATE & SAVE RESULTS (Draft Mode)
 // ==========================================
-export const publishResults = asyncHandler(async (req, res) => {
+export const createResults = asyncHandler(async (req, res) => {
   const { eventId, roundId } = req.params;
   const { results, qualifiedRegistrations } = req.body;
   const userId = req.user._id;
@@ -105,7 +105,7 @@ export const publishResults = asyncHandler(async (req, res) => {
   if (!round) throw new ApiError(404, "Round not found in this event");
 
   if (!round.isActive) {
-    throw new ApiError(400, "Can only publish results for the active round");
+    throw new ApiError(400, "Can only create results for the active round");
   }
 
   // Validate Registrations
@@ -146,15 +146,17 @@ export const publishResults = asyncHandler(async (req, res) => {
     qualified = qualifiedRegistrations;
   }
 
-  // Find or create result document
+  // Find or create result document (in DRAFT/UNPUBLISHED state)
   let resultDoc = await Result.findOne({ event: eventId, roundId });
 
   if (resultDoc) {
     resultDoc.results = formattedResults;
     resultDoc.qualifiedForNextRound = qualified;
-    resultDoc.published = true;
-    resultDoc.publishedBy = userId;
-    resultDoc.publishedAt = new Date();
+    resultDoc.published = false; // Keep unpublished
+    resultDoc.publishedBy = null;
+    resultDoc.publishedAt = null;
+    resultDoc.createdBy = userId;
+    resultDoc.createdAt = new Date();
     await resultDoc.save();
   } else {
     resultDoc = await Result.create({
@@ -164,19 +166,56 @@ export const publishResults = asyncHandler(async (req, res) => {
       roundSequenceNumber: round.sequenceNumber,
       results: formattedResults,
       qualifiedForNextRound: qualified,
-      published: true,
-      publishedBy: userId,
-      publishedAt: new Date()
+      published: false, // Create in DRAFT state
+      publishedBy: null,
+      publishedAt: null,
+      createdBy: userId,
+      createdAt: new Date()
     });
   }
+
+  return res.status(201).json(
+    new ApiResponse(201, resultDoc, "Results created successfully (unpublished)")
+  );
+});
+
+// ==========================================
+// 4B. PUBLISH RESULTS
+// ==========================================
+export const publishResults = asyncHandler(async (req, res) => {
+  const { eventId, roundId } = req.params;
+  const userId = req.user._id;
+
+  // Find existing result document
+  const resultDoc = await Result.findOne({ event: eventId, roundId });
+  if (!resultDoc) {
+    throw new ApiError(404, "Results not found. Please create results first");
+  }
+
+  if (resultDoc.published) {
+    throw new ApiError(400, "Results are already published");
+  }
+
+  const event = await Event.findById(eventId);
+  if (!event) throw new ApiError(404, "Event not found");
+
+  const round = event.rounds.find(r => r._id.toString() === roundId);
+  if (!round) throw new ApiError(404, "Round not found in this event");
+
+  // Mark as published
+  resultDoc.published = true;
+  resultDoc.publishedBy = userId;
+  resultDoc.publishedAt = new Date();
+  await resultDoc.save();
 
   // Update event round status
   round.resultsPublished = true;
   await event.save();
 
   // Update certificates for winners (if final round)
+  const isFinalRound = round.sequenceNumber === event.rounds.length;
   if (isFinalRound) {
-    const topThree = formattedResults.slice(0, 3);
+    const topThree = resultDoc.results.slice(0, 3);
     for (let i = 0; i < topThree.length; i++) {
       const result = topThree[i];
       

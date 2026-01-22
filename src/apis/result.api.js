@@ -3,6 +3,7 @@ import {
     createRound,
     activateRound,
     getRounds,
+    createResults,
     publishResults, 
     getPublicResults,
     getResults,
@@ -29,7 +30,7 @@ resultRouter.get("/:eventId/round/:roundId/qualified", getQualifiedTeams);
 // ==========================================
 // 🔒 PROTECTED ADMIN ROUTES
 // ==========================================
-resultRouter.use(protect, authorize("admin", "category_lead", "event_coordinator"));
+resultRouter.use(protect, authorize("admin", "category_lead", "event_coordinator", "faculty"));
 
 // Round Management
 resultRouter.post("/:eventId/rounds", verifyEventAuthority, createRound);
@@ -38,7 +39,8 @@ resultRouter.put("/:eventId/rounds/:roundId/activate", verifyEventAuthority, act
 resultRouter.delete("/:eventId/rounds/:roundId", verifyEventAuthority, deleteRound);
 
 // Result Management
-resultRouter.post("/:eventId/round/:roundId", verifyEventAuthority, publishResults);
+resultRouter.post("/:eventId/round/:roundId", verifyEventAuthority, createResults);
+resultRouter.put("/:eventId/round/:roundId/publish", verifyEventAuthority, publishResults);
 resultRouter.get("/:eventId/round/:roundId/admin", verifyEventAuthority, getResults);
 resultRouter.delete("/:eventId/round/:roundId", verifyEventAuthority, deleteResults);
 

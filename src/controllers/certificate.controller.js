@@ -72,3 +72,76 @@ export const getCertificateById = asyncHandler(async (req, res) => {
         new ApiResponse(200, cert, "Certificate fetched")
     );
 });
+
+// ==========================================
+// GET CERTIFICATES BY EVENT (All types)
+// ==========================================
+export const getCertificatesByEvent = asyncHandler(async (req, res) => {
+    const { eventId } = req.params;
+
+    const certs = await Certificate.find({ event: eventId })
+        .populate("user", "name email jnanagniId")
+        .populate("registration", "teamName")
+        .sort({ createdAt: -1 });
+
+    res.status(200).json(
+        new ApiResponse(200, certs, "Certificates fetched")
+    );
+});
+
+// ==========================================
+// GET WINNER CERTIFICATES BY EVENT
+// ==========================================
+export const getWinnerCertificatesByEvent = asyncHandler(async (req, res) => {
+    const { eventId } = req.params;
+
+    const certs = await Certificate.find({
+        event: eventId,
+        isWinner: true
+    })
+    .populate("user", "name email jnanagniId")
+    .populate("registration", "teamName")
+    .sort({ winnerRank: 1 });
+
+    res.status(200).json(
+        new ApiResponse(200, certs, "Winner certificates fetched")
+    );
+});
+
+// ==========================================
+// GET PARTICIPATION CERTIFICATES BY EVENT
+// ==========================================
+export const getParticipationCertificatesByEvent = asyncHandler(async (req, res) => {
+    const { eventId } = req.params;
+
+    const certs = await Certificate.find({
+        event: eventId,
+        type: "participation"
+    })
+    .populate("user", "name email jnanagniId")
+    .populate("registration", "teamName")
+    .sort({ createdAt: -1 });
+
+    res.status(200).json(
+        new ApiResponse(200, certs, "Participation certificates fetched")
+    );
+});
+
+// ==========================================
+// GET COMPLETION CERTIFICATES BY EVENT
+// ==========================================
+export const getCompletionCertificatesByEvent = asyncHandler(async (req, res) => {
+    const { eventId } = req.params;
+
+    const certs = await Certificate.find({
+        event: eventId,
+        type: "completion"
+    })
+    .populate("user", "name email jnanagniId")
+    .populate("registration", "teamName")
+    .sort({ createdAt: -1 });
+
+    res.status(200).json(
+        new ApiResponse(200, certs, "Completion certificates fetched")
+    );
+});
