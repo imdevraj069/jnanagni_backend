@@ -320,6 +320,96 @@ export const getQualifiedTeams = asyncHandler(async (req, res) => {
 });
 
 // ==========================================
+// 7A. GET ALL RESULTS FOR AN EVENT (Published & Unpublished)
+// ==========================================
+export const getAllResultsByEvent = asyncHandler(async (req, res) => {
+  const { eventId } = req.params;
+
+  const event = await Event.findById(eventId).select("name rounds");
+  if (!event) throw new ApiError(404, "Event not found");
+
+  // Get all results for this event
+  const results = await Result.find({ event: eventId })
+    .populate({
+      path: "results.registration",
+      select: "teamName registeredBy"
+    })
+    .populate({
+      path: "qualifiedForNextRound",
+      select: "teamName registeredBy"
+    })
+    .populate("publishedBy", "name email")
+    .populate("createdBy", "name email")
+    .sort({ roundSequenceNumber: 1 })
+    .lean();
+
+  // Map results with round info
+  const resultsWithRoundInfo = results.map(result => ({
+    ...result,
+    roundInfo: event.rounds.find(r => r._id.toString() === result.roundId),
+    publishStatus: result.published ? "published" : "draft"
+  }));
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        event: {
+          eventId: event._id,
+          eventName: event.name,
+          totalRounds: event.rounds.length
+        },
+        results: resultsWithRoundInfo,
+        summary: {
+          totalResults: resultsWithRoundInfo.length,
+          publishedCount: resultsWithRoundInfo.filter(r => r.published).length,
+          draftCount: resultsWithRoundInfo.filter(r => !r.published).length
+        }
+      },
+      "All results fetched successfully"
+    )
+  );
+});
+
+// ==========================================
+// 7B. UNPUBLISH RESULTS (Toggle back to draft)
+// ==========================================
+export const unpublishResults = asyncHandler(async (req, res) => {
+  const { eventId, roundId } = req.params;
+  const userId = req.user._id;
+
+  // Find existing result document
+  const resultDoc = await Result.findOne({ event: eventId, roundId });
+  if (!resultDoc) {
+    throw new ApiError(404, "Results not found");
+  }
+
+  if (!resultDoc.published) {
+    throw new ApiError(400, "Results are already in draft state");
+  }
+
+  const event = await Event.findById(eventId);
+  if (!event) throw new ApiError(404, "Event not found");
+
+  const round = event.rounds.find(r => r._id.toString() === roundId);
+  if (!round) throw new ApiError(404, "Round not found in this event");
+
+  // Mark as unpublished
+  resultDoc.published = false;
+  resultDoc.publishedBy = null;
+  resultDoc.publishedAt = null;
+  await resultDoc.save();
+
+  // Update event round status
+  round.resultsPublished = false;
+  await event.save();
+
+  return res.status(200).json(
+    new ApiResponse(200, resultDoc, "Results unpublished successfully (moved to draft)")
+  );
+});
+
+// ==========================================
 // 8. DELETE ROUND
 // ==========================================
 export const deleteRound = asyncHandler(async (req, res) => {

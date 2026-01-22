@@ -4,7 +4,9 @@ import {
     activateRound,
     getRounds,
     createResults,
-    publishResults, 
+    publishResults,
+    unpublishResults,
+    getAllResultsByEvent,
     getPublicResults,
     getResults,
     getQualifiedTeams,
@@ -41,7 +43,9 @@ resultRouter.delete("/:eventId/rounds/:roundId", verifyEventAuthority, deleteRou
 // Result Management
 resultRouter.post("/:eventId/round/:roundId", verifyEventAuthority, createResults);
 resultRouter.put("/:eventId/round/:roundId/publish", verifyEventAuthority, publishResults);
+resultRouter.put("/:eventId/round/:roundId/unpublish", verifyEventAuthority, unpublishResults);
 resultRouter.get("/:eventId/round/:roundId/admin", verifyEventAuthority, getResults);
+resultRouter.get("/:eventId/all-results", verifyEventAuthority, getAllResultsByEvent);
 resultRouter.delete("/:eventId/round/:roundId", verifyEventAuthority, deleteResults);
 
 export default resultRouter;
