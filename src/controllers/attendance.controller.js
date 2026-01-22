@@ -226,6 +226,28 @@ export const markAbsent = asyncHandler(async (req, res) => {
     const user = await User.findOne({ jnanagniId });
     if (!user) throw new ApiError(404, "User not found");
 
+    // Get event details for round info
+    const event = await Event.findById(eventId);
+    if (!event) throw new ApiError(404, "Event not found");
+
+    const currentRound = event.rounds.find(r => r._id.toString() === roundId);
+    if (!currentRound) throw new ApiError(404, "Round not found");
+
+    // Find the registration
+    const registration = await Registration.findOne({
+        event: eventId,
+        status: "active",
+        $or: [
+            { registeredBy: user._id }, 
+            { teamMembers: { $elemMatch: { user: user._id, status: "accepted" } } }
+        ]
+    });
+
+    if (!registration) {
+        throw new ApiError(404, "Registration not found for this user");
+    }
+
+    // Delete attendance record
     const deleted = await Attendance.findOneAndDelete({
         event: eventId,
         roundId: roundId,
@@ -236,8 +258,39 @@ export const markAbsent = asyncHandler(async (req, res) => {
         throw new ApiError(404, "No attendance record found");
     }
 
+    // =========================================================
+    // 📜 UPDATE/DELETE CERTIFICATE LOGIC
+    // =========================================================
+    try {
+        const certificate = await Certificate.findOne({ registration: registration._id });
+
+        if (certificate && certificate.roundReached === currentRound.name) {
+            // User was marked as reached this round
+            // Check if there's a previous round
+            const previousRound = event.rounds.find(r => r.sequenceNumber === currentRound.sequenceNumber - 1);
+
+            if (previousRound) {
+                // Downgrade certificate to previous round
+                certificate.roundReached = previousRound.name;
+                await certificate.save();
+                console.log(`[Certificate] Downgraded ${user.jnanagniId} to ${previousRound.name}`);
+            } else {
+                // No previous round, delete certificate completely
+                await Certificate.findOneAndDelete({ registration: registration._id });
+                console.log(`[Certificate] Deleted for ${user.jnanagniId} (no previous round)`);
+            }
+        }
+    } catch (error) {
+        console.error("[Certificate] Update failed (Non-blocking):", error);
+        // Non-blocking - continue even if certificate operation fails
+    }
+
     res.status(200).json(
-        new ApiResponse(200, null, `Attendance removed for ${user.name}`)
+        new ApiResponse(200, {
+            user: user.name,
+            removedFrom: currentRound.name,
+            action: "Attendance removed and certificate updated"
+        }, `Attendance removed for ${user.name}`)
     );
 });
 
