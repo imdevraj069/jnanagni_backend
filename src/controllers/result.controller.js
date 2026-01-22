@@ -107,36 +107,40 @@ export const getPublicResults = asyncHandler(async (req, res) => {
   );
 });
 
-// --- 4. ADMIN VIEW (See Drafts & Live) ---
-export const getAdminResults = asyncHandler(async (req, res) => {
-  const { eventId } = req.params;
-
-  // NO FILTER on 'published'
-  const result = await Result.findOne({ event: eventId })
-    .populate("event", "name")
-    .populate({
-      path: "winners.registration",
-      select: "teamName submissionData registeredBy teamMembers",
-      populate: [
-        { path: "registeredBy", select: "name email jnanagniId contactNo college" }, // Full info for admin
-        { path: "teamMembers.user", select: "name email jnanagniId" }
-      ]
-    })
-    .lean();
-
-  if (!result) {
-    return res.status(404).json(new ApiResponse(404, null, "No results created yet"));
-  }
-
-  return res.status(200).json(
-    new ApiResponse(200, result, "Admin results fetched")
-  );
-});
-
 // --- DELETE (Unchanged) ---
 export const deleteResults = asyncHandler(async (req, res) => {
   const { eventId } = req.params;
   const deleted = await Result.findOneAndDelete({ event: eventId });
   if (!deleted) throw new ApiError(404, "Results not found");
   return res.status(200).json(new ApiResponse(200, null, "Results deleted"));
+});
+
+export const getAdminResults = asyncHandler(async (req, res) => {
+  const { eventId } = req.params;
+  const { round } = req.query; // <--- ACCEPT ROUND QUERY
+
+  // Filter by Event AND Round (if provided, otherwise finding any might be ambiguous)
+  const query = { event: eventId };
+  if (round) query.round = round;
+
+  const result = await Result.findOne(query)
+    .populate("event", "name")
+    .populate({
+      path: "winners.registration",
+      select: "teamName submissionData registeredBy teamMembers",
+      populate: [
+        { path: "registeredBy", select: "name email jnanagniId contactNo college" },
+        { path: "teamMembers.user", select: "name email jnanagniId" }
+      ]
+    })
+    .lean();
+
+  if (!result) {
+    // Return empty structure instead of 404 to make frontend easier
+    return res.status(200).json(new ApiResponse(200, null, "No results created yet"));
+  }
+
+  return res.status(200).json(
+    new ApiResponse(200, result, "Admin results fetched")
+  );
 });
