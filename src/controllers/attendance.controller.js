@@ -284,3 +284,94 @@ export const getEventAttendanceStats = asyncHandler(async (req, res) => {
         new ApiResponse(200, stats, "Attendance stats fetched")
     );
 });
+
+// ==========================================
+// GET DETAILED ATTENDANCE LIST (Event & Round Wise)
+// ==========================================
+export const getAttendanceListByEventAndRound = asyncHandler(async (req, res) => {
+    const { eventId, roundId } = req.params;
+
+    // Verify event exists
+    const event = await Event.findById(eventId).select("name rounds");
+    if (!event) throw new ApiError(404, "Event not found");
+
+    // Verify round exists
+    const round = event.rounds.find(r => r._id.toString() === roundId);
+    if (!round) throw new ApiError(404, "Round not found");
+
+    // Get all attendance records with full details
+    const attendanceList = await Attendance.find({
+        event: eventId,
+        roundId: roundId
+    })
+    .populate({
+        path: "registration",
+        select: "teamName registeredBy teamMembers"
+    })
+    .populate({
+        path: "user",
+        select: "name email jnanagniId college"
+    })
+    .populate({
+        path: "scannedBy",
+        select: "name email"
+    })
+    .sort({ createdAt: 1 })
+    .lean();
+
+    // Group by registration (team) for better readability
+    const groupedByTeam = {};
+    
+    attendanceList.forEach(record => {
+        const regId = record.registration._id.toString();
+        
+        if (!groupedByTeam[regId]) {
+            groupedByTeam[regId] = {
+                registrationId: regId,
+                teamName: record.registration.teamName || "Solo",
+                registeredBy: record.registration.registeredBy,
+                presentMembers: [],
+                presentCount: 0,
+                checkInTime: record.createdAt
+            };
+        }
+        
+        groupedByTeam[regId].presentMembers.push({
+            userId: record.user._id,
+            name: record.user.name,
+            email: record.user.email,
+            jnanagniId: record.user.jnanagniId,
+            college: record.user.college,
+            scannedAt: record.createdAt,
+            scannedBy: record.scannedBy ? {
+                name: record.scannedBy.name,
+                email: record.scannedBy.email
+            } : null
+        });
+        
+        groupedByTeam[regId].presentCount++;
+    });
+
+    const response = {
+        event: {
+            eventId: event._id,
+            eventName: event.name
+        },
+        round: {
+            roundId: round._id,
+            roundName: round.name,
+            sequenceNumber: round.sequenceNumber
+        },
+        summary: {
+            totalPresent: attendanceList.length,
+            totalTeamsPresent: Object.keys(groupedByTeam).length
+        },
+        attendanceList: Object.values(groupedByTeam).sort((a, b) => 
+            new Date(a.checkInTime) - new Date(b.checkInTime)
+        )
+    };
+
+    res.status(200).json(
+        new ApiResponse(200, response, "Attendance list fetched successfully")
+    );
+});
