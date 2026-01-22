@@ -108,7 +108,44 @@ export const createResults = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Can only create results for the active round");
   }
 
-  // Validate Registrations
+  // =========================================================
+  // 🛡️ QUALIFICATION GATE FOR NON-FINAL ROUNDS
+  // =========================================================
+  const isFinalRound = round.name.toLowerCase() === "final" && round.sequenceNumber === event.rounds.length;
+  
+  if (!isFinalRound && round.sequenceNumber > 1) {
+    // For non-final rounds (except first round), only qualified teams can participate
+    const previousRound = event.rounds.find(r => r.sequenceNumber === round.sequenceNumber - 1);
+    
+    if (previousRound) {
+      const prevResult = await Result.findOne({
+        event: eventId,
+        roundId: previousRound._id,
+        published: true
+      });
+
+      if (!prevResult) {
+        throw new ApiError(400, 
+          `Results for '${previousRound.name}' must be published first before creating results for this round`
+        );
+      }
+
+      // Get list of qualified registration IDs
+      const qualifiedIds = prevResult.qualifiedForNextRound.map(id => id.toString());
+
+      // Validate that all registrations in results are qualified
+      const registrationIds = results.map(r => r.registrationId);
+      const unqualifiedIds = registrationIds.filter(id => !qualifiedIds.includes(id.toString()));
+
+      if (unqualifiedIds.length > 0) {
+        throw new ApiError(403, 
+          `${unqualifiedIds.length} registration(s) did not qualify from the previous round and cannot participate in this round`
+        );
+      }
+    }
+  }
+
+  // Validate Registrations exist and are active
   const registrationIds = results.map(r => r.registrationId);
   const validRegistrations = await Registration.find({
     _id: { $in: registrationIds },
@@ -125,19 +162,14 @@ export const createResults = asyncHandler(async (req, res) => {
     rank: r.rank || idx + 1,
     registration: r.registrationId,
     score: r.score || "",
-    won: r.rank && r.rank <= 3 && round.sequenceNumber === event.rounds.length // Top 3 in final round
+    won: r.rank && r.rank <= 3 && isFinalRound // Top 3 only in final round
   }));
 
-  // Check if this is the final round (last round)
-  const isFinalRound = round.sequenceNumber === event.rounds.length;
-
-  // For final round, auto-select top 3 as winners
-  let qualified = qualifiedRegistrations || [];
+  // Determine qualified teams for next round
+  let qualified = [];
   if (isFinalRound) {
-    // Top 3 are winners
-    qualified = formattedResults
-      .filter(r => r.rank && r.rank <= 3)
-      .map(r => r.registration);
+    // Top 3 are winners (no next round after final)
+    qualified = [];
   } else {
     // For other rounds, admin must specify who qualifies
     if (!qualifiedRegistrations || qualifiedRegistrations.length === 0) {
