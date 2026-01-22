@@ -212,14 +212,16 @@ export const publishResults = asyncHandler(async (req, res) => {
   round.resultsPublished = true;
   await event.save();
 
-  // Update certificates for winners (if final round)
-  const isFinalRound = round.sequenceNumber === event.rounds.length;
+  // Update certificates based on round type
+  const isFinalRound = round.name.toLowerCase() === "final" && round.sequenceNumber === event.rounds.length;
+  
   if (isFinalRound) {
+    // For FINAL ROUND: Generate winner certificates for top 3
     const topThree = resultDoc.results.slice(0, 3);
     for (let i = 0; i < topThree.length; i++) {
       const result = topThree[i];
       
-      // Update certificate for leader
+      // Update certificate for top 3 as winners
       await Certificate.findOneAndUpdate(
         { registration: result.registration },
         {
@@ -230,6 +232,19 @@ export const publishResults = asyncHandler(async (req, res) => {
           isGenerated: true
         },
         { upsert: true }
+      );
+    }
+  } else {
+    // For OTHER ROUNDS: Update all participants' certificates with reached round
+    for (const result of resultDoc.results) {
+      await Certificate.findOneAndUpdate(
+        { registration: result.registration },
+        {
+          roundReached: round.name,
+          type: "participation",
+          isGenerated: false
+        },
+        { upsert: true, new: true }
       );
     }
   }
