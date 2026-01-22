@@ -5,6 +5,12 @@ const eventSchema = new Schema(
     // ... existing fields ...
     name: { type: String, required: true },
     description: { type: String, required: true },
+    round: {
+      type: String,
+      enum: ["Preliminary", "Quarter-Final", "Semi-Final", "Final", "Check-In"],
+      default: "Check-In",
+      required: true,
+    },
     slug: { type: String, required: true, unique: true },
     category: {
       type: Schema.Types.ObjectId,
@@ -71,7 +77,11 @@ const eventSchema = new Schema(
     venue: String,
     date: Date,
     time: String,
-    prize: String,
+    prize: {
+      type: String,
+      default: "TBA",
+    },
+
     isRegistrationOpen: { type: Boolean, default: true },
     createdby: { type: Schema.Types.ObjectId, ref: "User", required: true },
   },

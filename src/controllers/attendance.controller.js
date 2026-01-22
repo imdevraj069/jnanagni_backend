@@ -2,27 +2,34 @@ import { Attendance } from "../models/attendance.model.js";
 import { Registration } from "../models/registration.model.js";
 import { Event } from "../models/event.model.js";
 import User from "../models/user.model.js";
+import { Result } from "../models/result.model.js"; // Needed for round validation
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import asyncHandler from "../utils/asyncHandler.js";
+import { generateCertificateInternal } from "./certificate.controller.js"; // Import the helper
+
+// Define the progression of rounds
+const ROUND_ORDER = ["Check-In", "Preliminary", "Quarter-Final", "Semi-Final", "Final"];
 
 // ==========================================
-// MARK PRESENT (With Admin Override Logic)
+// MARK ATTENDANCE (With Round Gating & Cert Generation)
 // ==========================================
 export const markAttendance = asyncHandler(async (req, res) => {
-    // 1. Accept 'force' parameter (Boolean)
-    const { jnanagniId, eventId, round = "check-in", force = false } = req.body;
+    // 1. Accept inputs
+    const { jnanagniId, eventId, force = false, round = "Check-In" } = req.body;
     const scannerId = req.user._id;
 
     if (!jnanagniId || !eventId) throw new ApiError(400, "IDs required");
 
-    // 2. Fetch Context
+    // 2. Fetch Context (User & Event)
     const event = await Event.findById(eventId);
     if (!event) throw new ApiError(404, "Event not found");
 
     const user = await User.findOne({ jnanagniId });
     if (!user) throw new ApiError(404, "User not found");
 
+    // 3. Find User's Registration (Solo or Team)
+    // We check if they are the Leader OR an Accepted Member
     const registration = await Registration.findOne({
         event: eventId,
         status: "active",
@@ -37,7 +44,41 @@ export const markAttendance = asyncHandler(async (req, res) => {
     }
 
     // =========================================================
-    // 🛑 VALIDATION: ROSTER CHECK (Blocking Logic)
+    // 🛡️ GATE 1: ROUND QUALIFICATION CHECK
+    // Logic: If trying to enter a later round, check if they passed the previous one.
+    // =========================================================
+    if (round !== "Check-In" && !force) {
+        const currentIndex = ROUND_ORDER.indexOf(round);
+        
+        if (currentIndex > 0) {
+            const previousRoundName = ROUND_ORDER[currentIndex - 1];
+
+            // If the previous round wasn't just "Check-In", we usually check the Results table.
+            if (previousRoundName !== "Check-In") {
+                const prevResult = await Result.findOne({ 
+                    event: eventId, 
+                    round: previousRoundName 
+                });
+
+                if (!prevResult) {
+                    throw new ApiError(400, `Results for '${previousRoundName}' have not been published yet.`);
+                }
+
+                // Check if this Registration ID is in the winners list AND is qualified
+                const isQualified = prevResult.winners.some(w => 
+                    w.registration.toString() === registration._id.toString() && w.qualified
+                );
+
+                if (!isQualified) {
+                    throw new ApiError(403, `⛔ Access Denied: Team did not qualify from ${previousRoundName}.`);
+                }
+            }
+        }
+    }
+
+    // =========================================================
+    // 🛡️ GATE 2: ROSTER SIZE CHECK (Group Events)
+    // Logic: Warn if team is physically smaller than minimum required size.
     // =========================================================
     let isRegistrationValid = true;
     let registrationErrorMsg = "";
@@ -51,49 +92,69 @@ export const markAttendance = asyncHandler(async (req, res) => {
             isRegistrationValid = false;
             registrationErrorMsg = `Team only has ${totalRegisteredCount} members (Min: ${event.minTeamSize}).`;
             
-            // 🛑 BLOCKING CONDITION
-            // If the team is incomplete AND the admin hasn't explicitly said "force: true"
+            // BLOCKING CONDITION (unless force=true)
             if (!force) {
-                // We return a 409 (Conflict) to signal the App to show a Confirmation Dialog
                 return res.status(409).json({
                     success: false,
                     statusCode: 409,
                     message: registrationErrorMsg,
                     data: {
-                        requiresConfirmation: true, // App uses this flag to show "Allow Anyway?" dialog
+                        requiresConfirmation: true, // Frontend shows "Allow Anyway?" dialog
                         teamName: registration.teamName,
                         currentSize: totalRegisteredCount,
-                        minRequired: event.minTeamSize
+                        minRequired: event.minTeamSize,
+                        warning: "Team size below minimum requirement."
                     }
                 });
             }
         }
     }
 
-    // 3. Create/Check Attendance Record
-    // (If we reached here, either the team is valid OR force=true)
+    // =========================================================
+    // ✅ EXECUTE: CREATE ATTENDANCE RECORD
+    // =========================================================
     
+    // Check if already scanned for THIS round
     let attendance = await Attendance.findOne({ event: eventId, user: user._id, round });
     
-    if (!attendance) {
-        attendance = await Attendance.create({
-            event: eventId,
-            registration: registration._id,
-            user: user._id,
-            round,
-            scannedBy: scannerId
-        });
-    } else {
+    if (attendance) {
         return res.status(200).json(
              new ApiResponse(200, {
                 status: "already_checked_in",
                 user: user.name,
                 checkInTime: attendance.createdAt
-             }, "User already checked in.")
+             }, "User already checked in for this round.")
         );
     }
 
-    // 4. Calculate Stats for Response
+    // Create Record
+    attendance = await Attendance.create({
+        event: eventId,
+        registration: registration._id,
+        user: user._id,
+        round: round,
+        scannedBy: scannerId
+    });
+
+    // =========================================================
+    // 📜 ACTION: AUTO-GENERATE / UPDATE CERTIFICATE
+    // =========================================================
+    try {
+        await generateCertificateInternal({
+            userId: user._id,
+            eventId: eventId,
+            registrationId: registration._id,
+            round: round
+        });
+        console.log(`[Certificate] Updated for ${user.jnanagniId} @ ${round}`);
+    } catch (error) {
+        console.error("[Certificate] Auto-generation failed (Non-blocking):", error);
+        // We do NOT throw here. Attendance is successful even if cert fails.
+    }
+
+    // =========================================================
+    // 📊 RESPONSE: CALCULATE LIVE STATS FOR UI
+    // =========================================================
     let teamStatusMsg = "Verified";
     let isPhysicalTeamComplete = true; 
 
@@ -108,7 +169,7 @@ export const markAttendance = asyncHandler(async (req, res) => {
         teamStatusMsg = `Physical Presence: ${currentPresentCount}/${event.minTeamSize}`;
         
         if (!isRegistrationValid) {
-             teamStatusMsg += " [FORCE ALLOWED]"; // Indicate this was an override
+             teamStatusMsg += " [FORCE ALLOWED]"; 
         } else if (isPhysicalTeamComplete) {
              teamStatusMsg += " [QUALIFIED]";
         } else {
@@ -121,7 +182,8 @@ export const markAttendance = asyncHandler(async (req, res) => {
             status: "success",
             user: user.name,
             teamName: registration.teamName || "Solo",
-            isRegistrationValid, // Will be false if forced
+            round: round,
+            isRegistrationValid, 
             isPhysicalTeamComplete,
             teamStatus: teamStatusMsg,
             timestamp: new Date()

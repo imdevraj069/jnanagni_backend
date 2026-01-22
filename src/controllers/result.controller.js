@@ -9,7 +9,7 @@ import asyncHandler from "../utils/asyncHandler.js";
 export const publishResults = asyncHandler(async (req, res) => {
   const { eventId } = req.params;
   // Default published to false if not sent
-  const { winners, published = false } = req.body; 
+  const { winners, published = false, round = "Final" } = req.body; 
   const userId = req.user._id;
 
   if (!winners || !Array.isArray(winners) || winners.length === 0) {
@@ -34,20 +34,22 @@ export const publishResults = asyncHandler(async (req, res) => {
   const formattedWinners = winners.map(w => ({
     rank: w.rank,
     registration: w.registrationId,
-    score: w.score || ""
+    score: w.score || "",
+    qualified: w.qualified !== false // Default true unless explicitly false
   }));
 
-  // Update or Create
-  let result = await Result.findOne({ event: eventId });
+  // Update logic: Find by Event AND Round
+  let result = await Result.findOne({ event: eventId, round: round });
 
   if (result) {
     result.winners = formattedWinners;
-    result.published = published; // Update status based on request
+    result.published = published;
     result.publishedBy = userId;
     await result.save();
   } else {
     result = await Result.create({
       event: eventId,
+      round: round, // Save the round
       winners: formattedWinners,
       published: published,
       publishedBy: userId
