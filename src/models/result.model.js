@@ -7,33 +7,56 @@ const resultSchema = new Schema(
       ref: "Event",
       required: true,
     },
-    // NEW: Specify which round these results are for
-    round: {
-      type: String,
-      enum: ["Preliminary", "Quarter-Final", "Semi-Final", "Final"], 
-      required: true
+    
+    // NEW: Link to the round in Event.rounds array
+    roundId: {
+      type: Schema.Types.ObjectId,
+      required: true,
+      // This references Event.rounds[].\_id
     },
-    // Array of qualifiers/winners
-    winners: [
+    
+    roundName: {
+      type: String,
+      required: true,
+      // e.g., "Preliminary", "Semi-Final", "Final"
+    },
+    
+    roundSequenceNumber: {
+      type: Number,
+      required: true,
+      // 1, 2, 3... to track order
+    },
+
+    // Winners/Results for this round
+    results: [
       {
-        rank: { type: Number }, // Rank in this specific round
+        rank: { type: Number },
         registration: { 
           type: Schema.Types.ObjectId, 
           ref: "Registration", 
           required: true 
         },
         score: { type: String, trim: true },
-        // NEW: specific flag to say if they move to next round
-        qualified: { type: Boolean, default: true } 
+        won: { type: Boolean, default: false } // True if made top 3
       }
     ],
+
+    // NEW: Admin-selected users who qualify for NEXT round
+    qualifiedForNextRound: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Registration"
+      }
+    ],
+
     published: { type: Boolean, default: false },
     publishedBy: { type: Schema.Types.ObjectId, ref: "User" },
+    publishedAt: { type: Date },
   },
   { timestamps: true }
 );
 
-// COMPOUND INDEX: One result set per round per event
-resultSchema.index({ event: 1, round: 1 }, { unique: true });
+// NEW: Compound unique index - only one result per round per event
+resultSchema.index({ event: 1, roundId: 1 }, { unique: true });
 
 export const Result = mongoose.model("Result", resultSchema);

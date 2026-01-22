@@ -1,10 +1,14 @@
 import { Router } from "express";
 import { 
+    createRound,
+    activateRound,
+    getRounds,
     publishResults, 
-    getPublicResults, 
-    getAdminResults,
-    toggleResultVisibility,
-    deleteResults 
+    getPublicResults,
+    getResults,
+    getQualifiedTeams,
+    deleteRound,
+    deleteResults
 } from "../controllers/result.controller.js";
 import { protect } from "../middlewares/auth.middleware.js";
 import { authorize } from "../middlewares/access.middleware.js";
@@ -13,52 +17,29 @@ import { verifyEventAuthority } from "../middlewares/ownership.middleware.js";
 const resultRouter = Router();
 
 // ==========================================
-// 🌎 PUBLIC ROUTE
-// ==========================================
-// Only returns if published: true
-resultRouter.get("/:eventId", getPublicResults);
-
-
-// ==========================================
-// 🔒 PROTECTED MANAGEMENT ROUTES
+// 🌎 PUBLIC ROUTES
 // ==========================================
 
-// 1. Get All Results (Drafts + Live) - For Dashboard
-resultRouter.get(
-    "/admin/:eventId", 
-    protect, 
-    authorize("admin", "category_lead", "event_coordinator"),
-    verifyEventAuthority, 
-    getAdminResults
-);
+// Get public results for a round
+resultRouter.get("/:eventId/round/:roundId", getPublicResults);
 
-// 2. Publish/Save Results (Upsert)
-resultRouter.post(
-    "/:eventId", 
-    protect, 
-    authorize("admin", "category_lead", "event_coordinator"),
-    verifyEventAuthority, 
-    publishResults
-);
+// Get qualified teams for next round
+resultRouter.get("/:eventId/round/:roundId/qualified", getQualifiedTeams);
 
-// 3. Quick Toggle (Live <-> Draft)
-// PUT /api/v1/results/:eventId/status
-// Body: { "publish": true }
-resultRouter.put(
-    "/:eventId/status",
-    protect, 
-    authorize("admin", "category_lead", "event_coordinator"),
-    verifyEventAuthority, 
-    toggleResultVisibility
-);
+// ==========================================
+// 🔒 PROTECTED ADMIN ROUTES
+// ==========================================
+resultRouter.use(protect, authorize("admin", "category_lead", "event_coordinator"));
 
-// 4. Delete
-resultRouter.delete(
-    "/:eventId", 
-    protect, 
-    authorize("admin", "category_lead"),
-    verifyEventAuthority,
-    deleteResults
-);
+// Round Management
+resultRouter.post("/:eventId/rounds", verifyEventAuthority, createRound);
+resultRouter.get("/:eventId/rounds", getRounds);
+resultRouter.put("/:eventId/rounds/:roundId/activate", verifyEventAuthority, activateRound);
+resultRouter.delete("/:eventId/rounds/:roundId", verifyEventAuthority, deleteRound);
+
+// Result Management
+resultRouter.post("/:eventId/round/:roundId", verifyEventAuthority, publishResults);
+resultRouter.get("/:eventId/round/:roundId/admin", verifyEventAuthority, getResults);
+resultRouter.delete("/:eventId/round/:roundId", verifyEventAuthority, deleteResults);
 
 export default resultRouter;

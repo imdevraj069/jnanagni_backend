@@ -2,34 +2,37 @@ import { Attendance } from "../models/attendance.model.js";
 import { Registration } from "../models/registration.model.js";
 import { Event } from "../models/event.model.js";
 import User from "../models/user.model.js";
-import { Result } from "../models/result.model.js"; // Needed for round validation
+import { Result } from "../models/result.model.js";
+import { Certificate } from "../models/certificate.model.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import asyncHandler from "../utils/asyncHandler.js";
-import { generateCertificateInternal } from "./certificate.controller.js"; // Import the helper
-
-// Define the progression of rounds
-const ROUND_ORDER = ["Check-In", "Preliminary", "Quarter-Final", "Semi-Final", "Final"];
+import mongoose from "mongoose";
 
 // ==========================================
-// MARK ATTENDANCE (With Round Gating & Cert Generation)
+// MARK ATTENDANCE (With Round Qualification Gating)
 // ==========================================
 export const markAttendance = asyncHandler(async (req, res) => {
-    // 1. Accept inputs
-    const { jnanagniId, eventId, force = false, round = "Check-In" } = req.body;
+    const { jnanagniId, eventId, roundId, force = false } = req.body;
     const scannerId = req.user._id;
 
-    if (!jnanagniId || !eventId) throw new ApiError(400, "IDs required");
+    if (!jnanagniId || !eventId || !roundId) {
+        throw new ApiError(400, "jnanagniId, eventId, and roundId are required");
+    }
 
-    // 2. Fetch Context (User & Event)
+    // Fetch Event
     const event = await Event.findById(eventId);
     if (!event) throw new ApiError(404, "Event not found");
 
+    // Find the round in event.rounds
+    const round = event.rounds.find(r => r._id.toString() === roundId);
+    if (!round) throw new ApiError(404, "Round not found in this event");
+
+    // Fetch User
     const user = await User.findOne({ jnanagniId });
     if (!user) throw new ApiError(404, "User not found");
 
-    // 3. Find User's Registration (Solo or Team)
-    // We check if they are the Leader OR an Accepted Member
+    // Find User's Registration (Solo or Team)
     const registration = await Registration.findOne({
         event: eventId,
         status: "active",
@@ -37,73 +40,72 @@ export const markAttendance = asyncHandler(async (req, res) => {
             { registeredBy: user._id }, 
             { teamMembers: { $elemMatch: { user: user._id, status: "accepted" } } }
         ]
-    }).populate("registeredBy", "name jnanagniId");
+    });
 
     if (!registration) {
-        throw new ApiError(403, "Access Denied: User is not registered for this event.");
+        throw new ApiError(403, "User is not registered for this event");
     }
 
     // =========================================================
-    // 🛡️ GATE 1: ROUND QUALIFICATION CHECK
-    // Logic: If trying to enter a later round, check if they passed the previous one.
+    // 🛡️ GATE 1: QUALIFICATION CHECK FROM PREVIOUS ROUND
     // =========================================================
-    if (round !== "Check-In" && !force) {
-        const currentIndex = ROUND_ORDER.indexOf(round);
+    if (round.sequenceNumber > 1 && !force) {
+        // Get previous round
+        const previousRound = event.rounds.find(r => r.sequenceNumber === round.sequenceNumber - 1);
         
-        if (currentIndex > 0) {
-            const previousRoundName = ROUND_ORDER[currentIndex - 1];
+        if (previousRound) {
+            // Get results from previous round
+            const prevResult = await Result.findOne({
+                event: eventId,
+                roundId: previousRound._id,
+                published: true
+            });
 
-            // If the previous round wasn't just "Check-In", we usually check the Results table.
-            if (previousRoundName !== "Check-In") {
-                const prevResult = await Result.findOne({ 
-                    event: eventId, 
-                    round: previousRoundName 
-                });
-
-                if (!prevResult) {
-                    throw new ApiError(400, `Results for '${previousRoundName}' have not been published yet.`);
-                }
-
-                // Check if this Registration ID is in the winners list AND is qualified
-                const isQualified = prevResult.winners.some(w => 
-                    w.registration.toString() === registration._id.toString() && w.qualified
+            if (!prevResult) {
+                throw new ApiError(400, 
+                    `Results for '${previousRound.name}' must be published first`
                 );
+            }
 
-                if (!isQualified) {
-                    throw new ApiError(403, `⛔ Access Denied: Team did not qualify from ${previousRoundName}.`);
-                }
+            // Check if this registration is in qualified list
+            const isQualified = prevResult.qualifiedForNextRound.some(regId =>
+                regId.toString() === registration._id.toString()
+            );
+
+            if (!isQualified) {
+                throw new ApiError(403, 
+                    `Your team did not qualify from the ${previousRound.name} round`
+                );
             }
         }
     }
 
     // =========================================================
     // 🛡️ GATE 2: ROSTER SIZE CHECK (Group Events)
-    // Logic: Warn if team is physically smaller than minimum required size.
     // =========================================================
     let isRegistrationValid = true;
     let registrationErrorMsg = "";
 
     if (event.participationType === "group") {
-        // Count Leader (1) + Accepted Members
-        const acceptedMembersCount = registration.teamMembers.filter(m => m.status === 'accepted').length;
-        const totalRegisteredCount = 1 + acceptedMembersCount; 
+        const acceptedMembersCount = registration.teamMembers
+            .filter(m => m.status === 'accepted').length;
+        const totalRegisteredCount = 1 + acceptedMembersCount;
 
         if (totalRegisteredCount < event.minTeamSize) {
             isRegistrationValid = false;
-            registrationErrorMsg = `Team only has ${totalRegisteredCount} members (Min: ${event.minTeamSize}).`;
+            registrationErrorMsg = `Team only has ${totalRegisteredCount} members (Min: ${event.minTeamSize})`;
             
-            // BLOCKING CONDITION (unless force=true)
             if (!force) {
                 return res.status(409).json({
                     success: false,
                     statusCode: 409,
                     message: registrationErrorMsg,
                     data: {
-                        requiresConfirmation: true, // Frontend shows "Allow Anyway?" dialog
+                        requiresConfirmation: true,
                         teamName: registration.teamName,
                         currentSize: totalRegisteredCount,
                         minRequired: event.minTeamSize,
-                        warning: "Team size below minimum requirement."
+                        warning: "Team size below minimum. Allow anyway?"
                     }
                 });
             }
@@ -111,69 +113,89 @@ export const markAttendance = asyncHandler(async (req, res) => {
     }
 
     // =========================================================
-    // ✅ EXECUTE: CREATE ATTENDANCE RECORD
+    // ✅ CREATE ATTENDANCE RECORD
     // =========================================================
-    
-    // Check if already scanned for THIS round
-    let attendance = await Attendance.findOne({ event: eventId, user: user._id, round });
-    
+    let attendance = await Attendance.findOne({ 
+        event: eventId, 
+        roundId: roundId,
+        user: user._id 
+    });
+
     if (attendance) {
         return res.status(200).json(
-             new ApiResponse(200, {
+            new ApiResponse(200, {
                 status: "already_checked_in",
                 user: user.name,
                 checkInTime: attendance.createdAt
-             }, "User already checked in for this round.")
+            }, "User already checked in for this round")
         );
     }
 
-    // Create Record
+    // Create attendance record
     attendance = await Attendance.create({
         event: eventId,
+        roundId: roundId,
+        roundName: round.name,
         registration: registration._id,
         user: user._id,
-        round: round,
         scannedBy: scannerId
     });
 
     // =========================================================
-    // 📜 ACTION: AUTO-GENERATE / UPDATE CERTIFICATE
+    // 📜 UPDATE CERTIFICATE - Track highest round reached
     // =========================================================
     try {
-        await generateCertificateInternal({
-            userId: user._id,
-            eventId: eventId,
-            registrationId: registration._id,
-            round: round
-        });
-        console.log(`[Certificate] Updated for ${user.jnanagniId} @ ${round}`);
+        let certificate = await Certificate.findOne({ registration: registration._id });
+
+        if (!certificate) {
+            // Create new certificate
+            const uniqueId = `JGN26-CERT-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            certificate = await Certificate.create({
+                user: user._id,
+                event: eventId,
+                registration: registration._id,
+                certificateId: uniqueId,
+                type: "participation",
+                roundReached: round.name,
+                issuedAt: new Date()
+            });
+        } else {
+            // Update round reached if this round is higher
+            const existingIndex = event.rounds.findIndex(r => r.name === certificate.roundReached);
+            if (round.sequenceNumber > existingIndex + 1) {
+                certificate.roundReached = round.name;
+            }
+            await certificate.save();
+        }
+
+        console.log(`[Certificate] Updated for ${user.jnanagniId} @ ${round.name}`);
     } catch (error) {
-        console.error("[Certificate] Auto-generation failed (Non-blocking):", error);
-        // We do NOT throw here. Attendance is successful even if cert fails.
+        console.error("[Certificate] Update failed (Non-blocking):", error);
+        // Non-blocking - continue even if certificate fails
     }
 
     // =========================================================
-    // 📊 RESPONSE: CALCULATE LIVE STATS FOR UI
+    // 📊 RESPONSE: TEAM STATUS
     // =========================================================
     let teamStatusMsg = "Verified";
-    let isPhysicalTeamComplete = true; 
+    let isPhysicalTeamComplete = true;
 
     if (event.participationType === "group") {
         const currentPresentCount = await Attendance.countDocuments({
             registration: registration._id,
             event: eventId,
-            round: round
+            roundId: roundId
         });
 
         isPhysicalTeamComplete = currentPresentCount >= event.minTeamSize;
-        teamStatusMsg = `Physical Presence: ${currentPresentCount}/${event.minTeamSize}`;
+        teamStatusMsg = `Present: ${currentPresentCount}/${event.minTeamSize}`;
         
         if (!isRegistrationValid) {
-             teamStatusMsg += " [FORCE ALLOWED]"; 
+            teamStatusMsg += " [FORCE]";
         } else if (isPhysicalTeamComplete) {
-             teamStatusMsg += " [QUALIFIED]";
+            teamStatusMsg += " [COMPLETE]";
         } else {
-             teamStatusMsg += " [WAITING]";
+            teamStatusMsg += " [INCOMPLETE]";
         }
     }
 
@@ -182,51 +204,59 @@ export const markAttendance = asyncHandler(async (req, res) => {
             status: "success",
             user: user.name,
             teamName: registration.teamName || "Solo",
-            round: round,
-            isRegistrationValid, 
+            roundName: round.name,
+            isRegistrationValid,
             isPhysicalTeamComplete,
             teamStatus: teamStatusMsg,
             timestamp: new Date()
-        }, isRegistrationValid ? `Marked Present: ${user.name}` : `Forced Entry: ${user.name}`)
+        }, "Attendance marked successfully")
     );
 });
 
 // ==========================================
-// MARK ABSENT (Undo Check-In)
+// MARK ABSENT (Remove attendance)
 // ==========================================
 export const markAbsent = asyncHandler(async (req, res) => {
-    const { jnanagniId, eventId, round = "check-in" } = req.body;
+    const { jnanagniId, eventId, roundId } = req.body;
+
+    if (!jnanagniId || !eventId || !roundId) {
+        throw new ApiError(400, "jnanagniId, eventId, and roundId are required");
+    }
 
     const user = await User.findOne({ jnanagniId });
     if (!user) throw new ApiError(404, "User not found");
 
     const deleted = await Attendance.findOneAndDelete({
         event: eventId,
-        user: user._id,
-        round: round
+        roundId: roundId,
+        user: user._id
     });
 
     if (!deleted) {
-        throw new ApiError(404, "No attendance record found to delete.");
+        throw new ApiError(404, "No attendance record found");
     }
 
     res.status(200).json(
-        new ApiResponse(200, null, `Marked Absent (Record Deleted): ${user.name}`)
+        new ApiResponse(200, null, `Attendance removed for ${user.name}`)
     );
 });
 
 // ==========================================
-// GET LIVE EVENT STATS (For Admin Dashboard)
+// GET ATTENDANCE STATS FOR A ROUND
 // ==========================================
 export const getEventAttendanceStats = asyncHandler(async (req, res) => {
-    const { eventId } = req.params;
-    const { round = "check-in" } = req.query;
+    const { eventId, roundId } = req.params;
 
     const stats = await Attendance.aggregate([
-        { $match: { event: new mongoose.Types.ObjectId(eventId), round: round } },
+        { 
+            $match: { 
+                event: new mongoose.Types.ObjectId(eventId),
+                roundId: new mongoose.Types.ObjectId(roundId)
+            }
+        },
         { 
             $group: { 
-                _id: "$registration", // Group by Team
+                _id: "$registration",
                 presentMembers: { $push: "$user" },
                 count: { $sum: 1 }
             }
@@ -242,12 +272,15 @@ export const getEventAttendanceStats = asyncHandler(async (req, res) => {
         { $unwind: "$regDetails" },
         {
             $project: {
+                _id: 0,
+                registrationId: "$_id",
                 teamName: "$regDetails.teamName",
-                presentCount: "$count",
-                // You can add logic here to compare with minTeamSize if needed
+                presentCount: "$count"
             }
         }
     ]);
 
-    res.status(200).json(new ApiResponse(200, stats, "Attendance stats fetched"));
+    res.status(200).json(
+        new ApiResponse(200, stats, "Attendance stats fetched")
+    );
 });

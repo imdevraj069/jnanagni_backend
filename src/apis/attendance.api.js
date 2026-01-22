@@ -8,35 +8,29 @@ const attendanceRouter = Router();
 
 attendanceRouter.use(protect);
 
-// Helper to map body to params for middleware
-const mapBodyToParams = (req, res, next) => {
-    if (req.body.eventId) req.params.eventId = req.body.eventId;
-    next();
-};
-
 // 1. Mark Present
+// POST /api/attendance/mark
+// Body: { eventId, roundId, jnanagniId, force? }
 attendanceRouter.post(
     "/mark",
     authorize("admin", "event_coordinator", "volunteer", "category_lead"),
-    mapBodyToParams,
-    verifyEventStaffAccess,
     markAttendance
 );
 
 // 2. Mark Absent (Undo)
+// POST /api/attendance/unmark
+// Body: { eventId, roundId, jnanagniId }
 attendanceRouter.post(
     "/unmark",
-    authorize("admin", "event_coordinator"), // Usually restricted to Coords+
-    mapBodyToParams,
-    verifyEventStaffAccess,
+    authorize("admin", "event_coordinator"),
     markAbsent
 );
 
-// 3. View Stats (For App Dashboard)
+// 3. View Stats for a round
+// GET /api/attendance/stats/:eventId/:roundId
 attendanceRouter.get(
-    "/stats/:eventId",
+    "/stats/:eventId/:roundId",
     authorize("admin", "event_coordinator", "category_lead"),
-    verifyEventStaffAccess,
     getEventAttendanceStats
 );
 

@@ -5,12 +5,23 @@ const eventSchema = new Schema(
     // ... existing fields ...
     name: { type: String, required: true },
     description: { type: String, required: true },
-    round: {
-      type: String,
-      enum: ["Preliminary", "Quarter-Final", "Semi-Final", "Final", "Check-In"],
-      default: "Check-In",
-      required: true,
-    },
+    
+    // ===== NEW: DYNAMIC ROUNDS SYSTEM =====
+    // Rounds created/managed by admin dynamically
+    rounds: [
+      {
+        _id: { type: Schema.Types.ObjectId, default: () => new mongoose.Types.ObjectId() },
+        name: { type: String, required: true }, // e.g., "Preliminary", "Semi-Final", "Final"
+        sequenceNumber: { type: Number, required: true }, // 1, 2, 3... determines order
+        isActive: { type: Boolean, default: false }, // Only one round is active at a time
+        resultsPublished: { type: Boolean, default: false },
+        createdAt: { type: Date, default: Date.now }
+      }
+    ],
+    
+    // Track which round is currently active (index in rounds array)
+    currentRoundIndex: { type: Number, default: -1 }, // -1 means no round started yet
+    
     slug: { type: String, required: true, unique: true },
     category: {
       type: Schema.Types.ObjectId,
@@ -19,19 +30,18 @@ const eventSchema = new Schema(
     },
     requiredPassType: {
       type: String,
-      enum: ["none", "egames", "workshop", "edm", "supersaver"], // 'none' for general free events
+      enum: ["none", "egames", "workshop", "edm", "supersaver"],
       default: "none"
     },
 
     // --- Media & Resources ---
-    poster: { type: String }, // Path to image file
-    images: [String], // Additional gallery images
+    poster: { type: String },
+    images: [String],
 
-    // Ruleset can be a file download OR a google doc link
-    rulesetFile: { type: String }, // Path to PDF/Doc
-    rulesetUrl: { type: String }, // External Link
+    rulesetFile: { type: String },
+    rulesetUrl: { type: String },
 
-    // ... Participation Config (keep existing) ...
+    // ... Participation Config ...
     participationType: {
       type: String,
       enum: ["solo", "group"],
@@ -42,7 +52,7 @@ const eventSchema = new Schema(
     minTeamSize: { type: Number, default: 1 },
     maxTeamSize: { type: Number, default: 1 },
 
-    // ... Forms & Access (keep existing) ...
+    // ... Forms & Access ...
     registrationFields: [
       {
         fieldLabel: String,
@@ -63,7 +73,7 @@ const eventSchema = new Schema(
     volunteerFields: [
       {
         fieldLabel: String,
-        fieldType: { type: String, default: "text" }, // text, number, url, select etc.
+        fieldType: { type: String, default: "text" },
         fieldName: String,
         required: { type: Boolean, default: false },
         options: [String],
@@ -73,7 +83,7 @@ const eventSchema = new Schema(
     coordinators: [{ type: Schema.Types.ObjectId, ref: "User" }],
     volunteers: [{ type: Schema.Types.ObjectId, ref: "User" }],
 
-    // ... Standard Details (keep existing) ...
+    // ... Standard Details ...
     venue: String,
     date: Date,
     time: String,

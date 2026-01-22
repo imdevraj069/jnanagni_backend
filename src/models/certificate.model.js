@@ -8,7 +8,7 @@ const certificateSchema = new mongoose.Schema({
     },
     type: {
         type: String,
-        enum: ["participation", "excellence", "completion"],
+        enum: ["participation", "excellence", "completion", "winner"],
         required: true
     },
     event: {
@@ -29,10 +29,25 @@ const certificateSchema = new mongoose.Schema({
         type: String,
         default: null
     },
-    round: {
+    
+    // NEW: Track the highest round the user reached
+    roundReached: {
         type: String,
         default: "Check-In"
     },
+    
+    // NEW: If user won (top 3), track that
+    isWinner: {
+        type: Boolean,
+        default: false
+    },
+    
+    winnerRank: {
+        type: Number,
+        default: null
+        // 1, 2, or 3 for final round winners
+    },
+    
     certificateId: {
         type: String,
         unique: true,
@@ -45,10 +60,6 @@ const certificateSchema = new mongoose.Schema({
     issuedAt: {
         type: Date,
         default: null
-    },
-    maxRoundReached: {
-        type: String,
-        default: "Check-In"
     },
 },{
     timestamps: true
