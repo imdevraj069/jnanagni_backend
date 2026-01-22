@@ -156,13 +156,20 @@ export const markAttendance = asyncHandler(async (req, res) => {
                 registration: registration._id,
                 certificateId: uniqueId,
                 type: "participation",
+                roundId: roundId,
+                roundName: round.name,
                 roundReached: round.name,
                 issuedAt: new Date()
             });
         } else {
             // Update round reached if this round is higher
-            const existingIndex = event.rounds.findIndex(r => r.name === certificate.roundReached);
-            if (round.sequenceNumber > existingIndex + 1) {
+            const currentRoundSeq = round.sequenceNumber;
+            const existingRound = event.rounds.find(r => r.name === certificate.roundReached);
+            const existingSeq = existingRound ? existingRound.sequenceNumber : 0;
+            
+            if (currentRoundSeq > existingSeq) {
+                certificate.roundId = roundId;
+                certificate.roundName = round.name;
                 certificate.roundReached = round.name;
             }
             await certificate.save();

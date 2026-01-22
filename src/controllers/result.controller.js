@@ -257,6 +257,8 @@ export const publishResults = asyncHandler(async (req, res) => {
       await Certificate.findOneAndUpdate(
         { registration: result.registration },
         {
+          roundId: roundId,
+          roundName: round.name,
           isWinner: true,
           type: i === 0 ? "excellence" : "completion",
           winnerRank: i + 1,
@@ -272,6 +274,8 @@ export const publishResults = asyncHandler(async (req, res) => {
       await Certificate.findOneAndUpdate(
         { registration: result.registration },
         {
+          roundId: roundId,
+          roundName: round.name,
           roundReached: round.name,
           type: "participation",
           isGenerated: false
