@@ -538,5 +538,56 @@ export const deleteResults = asyncHandler(async (req, res) => {
   }
   await event.save();
 
-  return res.status(200).json(new ApiResponse(200, null, "Results deleted"));
+  // =========================================================
+  // 🛡️ HANDLE CERTIFICATES BASED ON ROUND SEQUENCE
+  // =========================================================
+  const isFirstRound = round && round.sequenceNumber === 1;
+  const participantRegistrationIds = result.results.map(r => r.registration);
+
+  if (isFirstRound) {
+    // For FIRST ROUND: Delete all certificates for participants
+    await Certificate.deleteMany({
+      registration: { $in: participantRegistrationIds },
+      event: eventId
+    });
+  } else {
+    // For NON-FIRST ROUNDS: Revert certificates to previous round
+    const previousRoundSeq = round ? round.sequenceNumber - 1 : null;
+    const previousRound = event.rounds.find(r => r.sequenceNumber === previousRoundSeq);
+
+    if (previousRound) {
+      // Get results from previous round to restore certificate data
+      const previousResult = await Result.findOne({
+        event: eventId,
+        roundId: previousRound._id
+      });
+
+      if (previousResult) {
+        // Update certificates to reflect previous round as highest reached
+        for (const registrationId of participantRegistrationIds) {
+          await Certificate.findOneAndUpdate(
+            { registration: registrationId, event: eventId },
+            {
+              roundId: previousRound._id,
+              roundName: previousRound.name,
+              roundReached: previousRound.name,
+              type: "participation",
+              isWinner: false,
+              winnerRank: null,
+              isGenerated: false
+            },
+            { upsert: true }
+          );
+        }
+      }
+    } else {
+      // If no previous round found, delete certificates as fallback
+      await Certificate.deleteMany({
+        registration: { $in: participantRegistrationIds },
+        event: eventId
+      });
+    }
+  }
+
+  return res.status(200).json(new ApiResponse(200, null, "Results deleted successfully"));
 });
