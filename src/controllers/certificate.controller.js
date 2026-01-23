@@ -26,8 +26,9 @@ export const getUserCertificates = asyncHandler(async (req, res) => {
     const { userId } = req.params;
 
     const certs = await Certificate.find({ user: userId })
-        .populate("event", "name date")
-        .populate("registration", "teamName");
+        .populate("event")
+        .populate("registration")
+        .populate("user");
 
     res.status(200).json(
         new ApiResponse(200, certs, "Certificates fetched")
@@ -45,8 +46,10 @@ export const getFinalWinners = asyncHandler(async (req, res) => {
         isWinner: true
     })
     .sort({ winnerRank: 1 })
-    .populate("registration", "teamName registeredBy")
-    .populate("registeredBy", "name email");
+    .populate("registration")
+    .populate("user", "name email jnanagniId")
+    .populate("event")
+    .populate("registeredBy");
 
     res.status(200).json(
         new ApiResponse(200, winners, "Winners fetched")
@@ -80,8 +83,8 @@ export const getCertificatesByEvent = asyncHandler(async (req, res) => {
     const { eventId } = req.params;
 
     const certs = await Certificate.find({ event: eventId })
-        .populate("user", "name email jnanagniId")
-        .populate("registration", "teamName")
+        .populate("user")
+        .populate("registration")
         .sort({ createdAt: -1 });
 
     res.status(200).json(
@@ -99,8 +102,8 @@ export const getWinnerCertificatesByEvent = asyncHandler(async (req, res) => {
         event: eventId,
         isWinner: true
     })
-    .populate("user", "name email jnanagniId")
-    .populate("registration", "teamName")
+    .populate("user")
+    .populate("registration")
     .sort({ winnerRank: 1 });
 
     res.status(200).json(
@@ -118,8 +121,8 @@ export const getParticipationCertificatesByEvent = asyncHandler(async (req, res)
         event: eventId,
         type: "participation"
     })
-    .populate("user", "name email jnanagniId")
-    .populate("registration", "teamName")
+    .populate("user")
+    .populate("registration")
     .sort({ createdAt: -1 });
 
     res.status(200).json(
@@ -137,8 +140,8 @@ export const getCompletionCertificatesByEvent = asyncHandler(async (req, res) =>
         event: eventId,
         type: "completion"
     })
-    .populate("user", "name email jnanagniId")
-    .populate("registration", "teamName")
+    .populate("user")
+    .populate("registration")
     .sort({ createdAt: -1 });
 
     res.status(200).json(
