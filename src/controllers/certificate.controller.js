@@ -60,9 +60,9 @@ export const getCertificateById = asyncHandler(async (req, res) => {
     const { certificateId } = req.params;
 
     const cert = await Certificate.findOne({ certificateId })
-        .populate("event", "name date")
-        .populate("registration", "teamName")
-        .populate("user", "name email jnanagniId");
+        .populate("event")
+        .populate("registration")
+        .populate("user");
 
     if (!cert) {
         throw new ApiError(404, "Certificate not found");
