@@ -157,6 +157,31 @@ export const createResults = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Invalid or inactive registrations detected");
   }
 
+  // =========================================================
+  // 🛡️ ATTENDANCE VALIDATION GATE
+  // =========================================================
+  // Verify that all registrations have attendance records for this round
+  const attendanceRecords = await Attendance.find({
+    event: eventId,
+    roundId,
+    registration: { $in: registrationIds }
+  });
+
+  const attendedRegistrationIds = new Set(
+    attendanceRecords.map(a => a.registration.toString())
+  );
+
+  const unattendedRegistrations = registrationIds.filter(
+    id => !attendedRegistrationIds.has(id.toString())
+  );
+
+  if (unattendedRegistrations.length > 0) {
+    throw new ApiError(
+      403,
+      `${unattendedRegistrations.length} registration(s) do not have attendance records for this round. Only registrations with attendance can have results marked.`
+    );
+  }
+
   // Format results
   const formattedResults = results.map((r, idx) => ({
     rank: r.rank || idx + 1,
