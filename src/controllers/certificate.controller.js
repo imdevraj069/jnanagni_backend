@@ -64,6 +64,13 @@ export const getCertificateById = asyncHandler(async (req, res) => {
 
     const cert = await Certificate.findOne({ certificateId })
         .populate("event")
+        // populate category of event
+        .populate({
+            path: "event",
+            populate: {
+                path: "category"
+            }
+        })
         .populate("registration")
         .populate("user");
 
