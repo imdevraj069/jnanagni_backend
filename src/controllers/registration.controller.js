@@ -465,178 +465,141 @@ export const deleteRegistration = asyncHandler(async (req, res) => {
 export const getMyInvites = asyncHandler(async (req, res) => {
   const user = req.user;
 
-  try {
-    const invites = await Registration.find({
-      teamMembers: {
-        $elemMatch: {
-          $or: [{ user: user._id }, { email: user.email }],
-          status: "pending",
-        },
+  const invites = await Registration.find({
+    teamMembers: {
+      $elemMatch: {
+        $or: [{ user: user._id }, { email: user.email }],
+        status: "pending",
       },
-    })
-      .populate("registeredBy", "name email")
-      .populate("event")
-      .lean();
+    },
+  })
+    .populate("registeredBy", "name email")
+    .populate("event")
+    .lean();
 
-    res.status(200).json(invites);
-  } catch (error) {
-    res.status(500).json({ message: "Error fetching invites", error });
-  }
+  res.status(200).json(new ApiResponse(200, invites, "Invites fetched successfully"));
 });
 
-export const getRegistrationsByEvent = async (req, res) => {
-  try {
-    const eventId = req.params.eventId;
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20; // Higher default limit for lists
-    const skip = (page - 1) * limit;
+export const getRegistrationsByEvent = asyncHandler(async (req, res) => {
+  const eventId = req.params.eventId;
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 20; // Higher default limit for lists
+  const skip = (page - 1) * limit;
 
-    const registrations = await Registration.find({ event: eventId })
-      // .populate("registeredBy",  "name email jnanagniId contactNo")
-      .populate({
-        path: "registeredBy",
-        select: "name email jnanagniId contactNo",
-        model: User,
-      })
-      .populate("event")
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean();
+  const registrations = await Registration.find({ event: eventId })
+    // .populate("registeredBy",  "name email jnanagniId contactNo")
+    .populate({
+      path: "registeredBy",
+      select: "name email jnanagniId contactNo",
+      model: User,
+    })
+    .populate("event")
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit)
+    .lean();
 
-    const totalDocs = await Registration.countDocuments({ event: eventId });
+  const totalDocs = await Registration.countDocuments({ event: eventId });
 
-    res.status(200).json({
-      registrations,
-      pagination: {
-        totalDocs,
-        totalPages: Math.ceil(totalDocs / limit),
-        currentPage: page,
-        limit,
-      },
-    });
-  } catch (error) {
-    res.status(500).json({ message: "Error fetching registrations", error });
+  res.status(200).json({
+    registrations,
+    pagination: {
+      totalDocs,
+      totalPages: Math.ceil(totalDocs / limit),
+      currentPage: page,
+      limit,
+    },
+  });
+});
+
+export const updateRegistrationStatus = asyncHandler(async (req, res) => {
+  const registrationId = req.params.id;
+  const { status } = req.body;
+
+  const registration = await Registration.findById(registrationId);
+  if (!registration) {
+    throw new ApiError(404, "Registration not found");
   }
-};
 
-export const updateRegistrationStatus = async (req, res) => {
-  try {
-    const registrationId = req.params.id;
-    const { status } = req.body;
-
-    const registration = await Registration.findById(registrationId);
-    if (!registration) {
-      return res.status(404).json({ message: "Registration not found" });
-    }
-
-    if (!["active", "cancelled"].includes(status)) {
-      return res.status(400).json({ message: "Invalid status value" });
-    }
-
-    // if cancelled, delete the registration
-    if (status === "cancelled") {
-      await Registration.findByIdAndDelete(registrationId);
-      return res
-        .status(200)
-        .json({ message: "Registration cancelled successfully" });
-    }
-
-    // Otherwise, update status
-    registration.status = status;
-    await registration.save();
-
-    res.status(200).json(registration);
-  } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Error updating registration status", error });
+  if (!["active", "cancelled"].includes(status)) {
+    throw new ApiError(400, "Invalid status value");
   }
-};
 
-export const getRegistrationsByUser = async (req, res) => {
-  try {
-    const userId = req.params.userId;
-    // Find registrations where user is either the leader OR an accepted team member
-    const registrations = await Registration.find({
-      $or: [
-        { registeredBy: userId },
-        {
-          teamMembers: {
-            $elemMatch: {
-              user: userId,
-              status: "accepted",
-            },
+  // if cancelled, delete the registration
+  if (status === "cancelled") {
+    await Registration.findByIdAndDelete(registrationId);
+    return res
+      .status(200)
+      .json(new ApiResponse(200, {}, "Registration cancelled successfully"));
+  }
+
+  // Otherwise, update status
+  registration.status = status;
+  await registration.save();
+
+  res.status(200).json(new ApiResponse(200, registration, "Status updated successfully"));
+});
+
+export const getRegistrationsByUser = asyncHandler(async (req, res) => {
+  const userId = req.params.userId;
+  // Find registrations where user is either the leader OR an accepted team member
+  const registrations = await Registration.find({
+    $or: [
+      { registeredBy: userId },
+      {
+        teamMembers: {
+          $elemMatch: {
+            user: userId,
+            status: "accepted",
           },
         },
-      ],
-      status: "active",
-    })
-      .populate("registeredBy", "name email")
-      .populate("event")
-      .populate("teamMembers.user", "name email jnanagniId")
-      .lean();
+      },
+    ],
+    status: "active",
+  })
+    .populate("registeredBy", "name email")
+    .populate("event")
+    .populate("teamMembers.user", "name email jnanagniId")
+    .lean();
 
-    res.status(200).json(registrations);
-  } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Error fetching user registrations", error });
-  }
-};
+  res.status(200).json(new ApiResponse(200, registrations, "User registrations fetched successfully"));
+});
 
-export const getRegistrationById = async (req, res) => {
-  try {
-    const registrationId = req.params.id;
-    const registration = await Registration.findById(registrationId)
-      .populate("user", "name email")
-      .populate("event")
-      .lean();
-    if (!registration) {
-      return res.status(404).json({ message: "Registration not found" });
-    }
-    res.status(200).json(registration);
-  } catch (error) {
-    res.status(500).json({ message: "Error fetching registration", error });
+export const getRegistrationById = asyncHandler(async (req, res) => {
+  const registrationId = req.params.id;
+  const registration = await Registration.findById(registrationId)
+    .populate("user", "name email")
+    .populate("event")
+    .lean();
+  if (!registration) {
+    throw new ApiError(404, "Registration not found");
   }
-};
+  res.status(200).json(new ApiResponse(200, registration, "Registration fetched successfully"));
+});
 
 // update registration submission data
-export const updateRegistrationSubmissionData = async (req, res) => {
-  try {
-    const registrationId = req.params.id;
-    const { submissionData } = req.body;
+export const updateRegistrationSubmissionData = asyncHandler(async (req, res) => {
+  const registrationId = req.params.id;
+  const { submissionData } = req.body;
 
-    const registration = await Registration.findById(registrationId);
-    if (!registration) {
-      return res.status(404).json({ message: "Registration not found" });
-    }
-
-    registration.submissionData = submissionData;
-    await registration.save();
-
-    res.status(200).json(registration);
-  } catch (error) {
-    res.status(500).json({ message: "Error updating submission data", error });
+  const registration = await Registration.findById(registrationId);
+  if (!registration) {
+    throw new ApiError(404, "Registration not found");
   }
-};
+
+  registration.submissionData = submissionData;
+  await registration.save();
+
+  res.status(200).json(new ApiResponse(200, registration, "Submission data updated successfully"));
+});
 
 // get all registrations (admin)
-export const getAllRegistrations = async (req, res) => {
-  try {
-    const registrations = await Registration.find()
-      .populate("registeredBy", "name email jnanagniId contactNo")
-      .populate("event")
-      .sort({ createdAt: -1 })
-      .lean();
+export const getAllRegistrations = asyncHandler(async (req, res) => {
+  const registrations = await Registration.find()
+    .populate("registeredBy", "name email jnanagniId contactNo")
+    .populate("event")
+    .sort({ createdAt: -1 })
+    .lean();
 
-    res
-      .status(200)
-      .json({
-        message: "All registrations fetched successfully",
-        registrations,
-      });
-  } catch (error) {
-    res.status(500).json({ message: "Error fetching registrations", error });
-  }
-};
+  res.status(200).json(new ApiResponse(200, registrations, "All registrations fetched successfully"));
+});
