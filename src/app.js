@@ -45,21 +45,7 @@ const app = express();
 // | against common web vulnerabilities (e.g., XSS, clickjacking, etc.).
 // | This should be one of the first middleware applied.
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https:"],
-      imgSrc: ["'self'", "data:", "https://images.unsplash.com", "https://node.jnanagni.in", "https://jnanagni.in", "https://admin.jnanagni.in", "http://localhost:3000"],
-      fontSrc: ["'self'", "https:", "data:"],
-      connectSrc: ["'self'"],
-      frameSrc: ["'self'"],
-      objectSrc: ["'none'"],
-    },
-  },
-  crossOriginResourcePolicy: { policy: "cross-origin" },
-}));
+app.use(helmet());
 
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------
 // | HTTP Request Logging (Morgan)
